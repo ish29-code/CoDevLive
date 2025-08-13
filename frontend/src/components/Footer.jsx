@@ -1,10 +1,9 @@
-// src/components/Footer.jsx
 import React from "react";
 
 const Footer = () => {
   return (
-    <footer className="bg-gray-200 dark:bg-gray-900 text-center py-4 mt-10">
-      <p className="text-gray-700 dark:text-gray-300">
+    <footer className="flex justify-center items-center w-full bg-gray-800 dark:bg-gray-900 py-4">
+      <p className="text-center w-[30%] text-white dark:text-gray-300">
         © {new Date().getFullYear()} DevSphere. All rights reserved.
       </p>
     </footer>
