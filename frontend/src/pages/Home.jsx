@@ -1,6 +1,6 @@
 const Home = () => {
   return (
-    <section className="w-full flex flex-col items-center justify-center min-h-[85vh] 
+    <section className="w-full flex flex-col items-center justify-center min-h-[88vh] 
       text-[var(--foreground)] text-center px-4
       bg-gradient-to-br from-[var(--gradient-start)] via-[var(--background)] to-[var(--gradient-end)]">
       

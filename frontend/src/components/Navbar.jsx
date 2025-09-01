@@ -1,11 +1,14 @@
 import React, { useState } from "react";
 import { Button } from "../components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu";
-import { Sun, Moon, Menu, X, User } from "lucide-react";
+import { Sun, Moon, Menu, X, User, Link2 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
+  const { user,  logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const features = [
@@ -19,10 +22,7 @@ const Navbar = () => {
     "Admin Dashboard", "Analytics"
   ];
 
-  const profileFeatures = [
-    "User Profiles", "Two-Factor Auth"
-  ];
-
+  const profileFeatures = ["User Profiles", "Settings"];
   return (
     <nav className="bg-[var(--background)] border-b border-[var(--border)] relative">
       <div className="container-center flex justify-between items-center py-4">
@@ -30,8 +30,8 @@ const Navbar = () => {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex space-x-6 items-center">
-          <a href="#home" className="nav-link">Home</a>
-          <a href="#about" className="nav-link">About</a>
+          <Link to="/" className="nav-link">Home</Link>
+          <Link to="/about" className="nav-link">About</Link>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -44,22 +44,26 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <a href="#contact" className="nav-link">Contact</a>
+          <Link to="/interview" className="nav-link">Interview</Link>
 
           {/* Profile Dropdown (Desktop) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="p-2 rounded-full">
-                <User size={20} className={theme === "light" ? "text-gray-800" : "text-white"} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[var(--card)] text-[var(--card-foreground)] border border-[var(--border)]">
-              {profileFeatures.map((feature, index) => (
-                <DropdownMenuItem key={index} className="cursor-pointer">{feature}</DropdownMenuItem>
-              ))}
-              <DropdownMenuItem className="cursor-pointer">Logout</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="p-2 rounded-full">
+                  <User size={20} className={theme === "light" ? "text-gray-800" : "text-white"} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[var(--card)] text-[var(--card-foreground)] border border-[var(--border)]">
+                {profileFeatures.map((feature, index) => (
+                  <DropdownMenuItem key={index} className="cursor-pointer">{feature}</DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Theme Toggle */}
           <Button variant="ghost" onClick={toggleTheme}>
@@ -70,27 +74,37 @@ const Navbar = () => {
             )}
           </Button>
 
-          {/* Auth Buttons */}
-          <button className="btn-outline">Login</button>
-          <button className="btn-primary">Sign Up</button>
+          {/* Auth Buttons (Only show if NOT logged in) */}
+          {!user ? (
+            <>
+              <div className="flex space-x-2">
+                <Link to="/authpage"><Button className="btn-outline" >Login</Button></Link>
+                <Link to="/authpage"><Button className="btn-primary" >Sign Up</Button></Link>
+              </div>
+            </>
+          ) : (
+            <Button onClick={logout} className="btn-outline">Logout</Button>
+          )}
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu */}
         <div className="md:hidden flex items-center space-x-3">
-          {/* Profile Dropdown (Mobile, before theme toggle) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="p-2 rounded-full">
-                <User size={20} className={theme === "light" ? "text-gray-800" : "text-white"} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-[var(--card)] text-[var(--card-foreground)] border border-[var(--border)]">
-              {profileFeatures.map((feature, index) => (
-                <DropdownMenuItem key={index} className="cursor-pointer">{feature}</DropdownMenuItem>
-              ))}
-              <DropdownMenuItem className="cursor-pointer">Logout</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Profile Dropdown (Mobile) */}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="p-2 rounded-full">
+                  <User size={20} className={theme === "light" ? "text-gray-800" : "text-white"} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-[var(--card)] text-[var(--card-foreground)] border border-[var(--border)]">
+                {profileFeatures.map((feature, index) => (
+                  <DropdownMenuItem key={index} className="cursor-pointer">{feature}</DropdownMenuItem>
+                ))}
+                <DropdownMenuItem onClick={logout} className="cursor-pointer">Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Theme Toggle */}
           <Button variant="ghost" onClick={toggleTheme}>
@@ -116,12 +130,21 @@ const Navbar = () => {
             <h2 className="text-lg font-bold text-[var(--accent)]">Menu</h2>
             <X onClick={() => setMenuOpen(false)} className="cursor-pointer text-[var(--foreground)]" />
           </div>
-          <a href="#home" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Home</a>
-          <a href="#about" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>About</a>
-          <a href="#features" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Features</a>
-          <a href="#contact" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Contact</a>
-          <button className="btn-outline w-full">Login</button>
-          <button className="btn-primary w-full">Sign Up</button>
+          <Link to="/" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Home</Link>
+          <Link to="/about" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>About</Link>
+          <Link to="/features" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Features</Link>
+          <Link to="/interview" className="block nav-link cursor-pointer" onClick={() => setMenuOpen(false)}>Interview</Link>
+
+          
+          {!user ? (
+            <>
+                <Link to="/authpage"><Button className="btn-outline" >Login</Button></Link>
+                <Link to="/authpage"><Button className="btn-primary" >Sign Up</Button></Link>
+            </>   
+            
+          ) : (
+            <button onClick={logout} className="btn-outline w-full">Logout</button>
+          )}
         </div>
       )}
     </nav>
@@ -129,3 +152,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
