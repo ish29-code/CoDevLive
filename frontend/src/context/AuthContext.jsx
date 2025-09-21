@@ -8,6 +8,31 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // if redirected back with token, save it
+useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
+  if (token) {
+    localStorage.setItem("token", token);
+
+    // fetch user profile right away
+    fetch("http://localhost:5000/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && !data.message) {
+          localStorage.setItem("user", JSON.stringify(data));
+          setUser(data);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch user:", err));
+
+    window.history.replaceState({}, document.title, "/"); // clean URL
+  }
+}, []);
+
+
   // Load user from localStorage on refresh
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -17,6 +42,8 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  
 
   const login = async (email, password) => {
     const res = await loginService({ email, password });

@@ -1,37 +1,38 @@
 import React, { useState } from "react";
 import { useTheme } from "../context/ThemeContext";
-import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "../context/AuthContext"; // ✅ use context
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Github, Mail } from "lucide-react";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
+  const [isReset, setIsReset] = useState(false); // reset password mode
   const { theme } = useTheme();
-  const { login, signup } = useAuth(); // ✅ useAuth instead of calling services directly
+  const { login, signup } = useAuth();
+  const navigate = useNavigate();
 
-  // State for showing password
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Form state
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const navigate = useNavigate();
 
-  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     try {
+      if (isReset) {
+        alert(`📧 Reset link sent to ${email}`);
+        setIsReset(false);
+        return;
+      }
+
       if (isLogin) {
-        // 🔹 Login via AuthContext
         await login(email, password);
-        alert(`✅ Logged in as ${email}`);
+        alert("✅ Logged in!");
         navigate("/");
       } else {
-        // 🔹 Signup via AuthContext
         if (password !== confirmPassword) {
           alert("❌ Passwords do not match");
           return;
@@ -47,117 +48,126 @@ export default function AuthPage() {
   };
 
   return (
-    <div
-      className="flex min-h-screen items-center justify-center transition-colors duration-150"
-      style={{
-        background: `linear-gradient(135deg, var(--gradient-start) 0%, var(--background) 40%, var(--gradient-end) 100%)`,
-      }}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl shadow-xl p-8 
-        bg-[var(--card)] text-[var(--card-foreground)] 
-        border border-[var(--border)] transition-colors duration-150"
-      >
-        <h2 className="text-2xl font-bold text-center mb-6 text-[var(--accent)]">
-          {isLogin ? "Login" : "Sign Up"}
-        </h2>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg 
-              bg-[var(--card)] text-[var(--card-foreground)] 
-              border-[var(--border)] focus:outline-none 
-              focus:ring-2 focus:ring-[var(--ring)]"
-              required
-            />
-          )}
-
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 border rounded-lg 
-            bg-[var(--card)] text-[var(--card-foreground)] 
-            border-[var(--border)] focus:outline-none 
-            focus:ring-2 focus:ring-[var(--ring)]"
-            required
-          />
-
-          {/* Password field with eye toggle */}
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg 
-              bg-[var(--card)] text-[var(--card-foreground)] 
-              border-[var(--border)] focus:outline-none 
-              focus:ring-2 focus:ring-[var(--ring)]"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-3 flex items-center text-[var(--foreground)]"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-
-          {/* Confirm Password (only in signup) */}
-          {!isLogin && (
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Confirm Password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg 
-                bg-[var(--card)] text-[var(--card-foreground)] 
-                border-[var(--border)] focus:outline-none 
-                focus:ring-2 focus:ring-[var(--ring)]"
-                required
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setShowConfirmPassword(!showConfirmPassword)
-                }
-                className="absolute inset-y-0 right-3 flex items-center text-[var(--foreground)]"
-              >
-                {showConfirmPassword ? (
-                  <EyeOff size={18} />
-                ) : (
-                  <Eye size={18} />
-                )}
-              </button>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--gradient-start)] via-[var(--background)] to-[var(--gradient-end)]">
+      <Card className="w-full max-w-md p-6 shadow-xl border-[var(--border)] bg-[var(--card)] text-[var(--card-foreground)]">
+        <CardHeader>
+          <CardTitle className="text-2xl text-center text-[var(--accent)]">
+            {isReset ? "Reset Password" : isLogin ? "Login" : "Sign Up"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Social login buttons */}
+          {!isReset && (
+            <div className="space-y-3">
+              <Button variant="outline" onClick={() => window.location.href = "http://localhost:5000/api/auth/google"} className="w-full flex items-center gap-2">
+                <Mail size={18} /> Continue with Gmail
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = "http://localhost:5000/api/auth/github"} className="w-full flex items-center gap-2">
+                <Github size={18} /> Continue with GitHub
+              </Button>
+              <div className="flex items-center my-3">
+                <hr className="flex-grow border-[var(--border)]" />
+                <span className="px-3 text-sm text-gray-500">OR</span>
+                <hr className="flex-grow border-[var(--border)]" />
+              </div>
             </div>
           )}
 
-          <button type="submit" className="btn-primary w-full">
-            {isLogin ? "Login" : "Sign Up"}
-          </button>
-        </form>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isReset ? (
+              <>
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Button type="submit" className="w-full btn-primary">
+                  Send Reset Link
+                </Button>
+              </>
+            ) : (
+              <>
+                {!isLogin && (
+                  <Input
+                    type="text"
+                    placeholder="Full Name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                )}
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                {!isLogin && (
+                  <Input
+                    type="password"
+                    placeholder="Confirm Password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                )}
+                <Button type="submit" className="w-full btn-primary">
+                  {isLogin ? "Login" : "Sign Up"}
+                </Button>
+              </>
+            )}
+          </form>
 
-        {/* Toggle */}
-        <p className="text-center mt-4">
-          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="font-semibold hover:underline text-[var(--accent)]"
-          >
-            {isLogin ? "Sign Up" : "Login"}
-          </button>
-        </p>
-      </div>
+          {/* Links */}
+          <div className="text-center mt-4 text-sm">
+            {isReset ? (
+              <button
+                onClick={() => setIsReset(false)}
+                className="text-[var(--accent)] hover:underline"
+              >
+                Back to Login
+              </button>
+            ) : isLogin ? (
+              <>
+                <button
+                  onClick={() => setIsReset(true)}
+                  className="block mb-2 text-[var(--accent)] hover:underline"
+                >
+                  Forgot Password?
+                </button>
+                Don’t have an account?{" "}
+                <button
+                  onClick={() => setIsLogin(false)}
+                  className="text-[var(--accent)] hover:underline font-semibold"
+                >
+                  Sign Up
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className="text-[var(--accent)] hover:underline font-semibold"
+                >
+                  Login
+                </button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -32,7 +32,6 @@ export const register = async (req, res) => {
 // @desc Login
 export const login = async (req, res) => {
   try {
-    console.log("Login attempt:", req.body);
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select("+password");
