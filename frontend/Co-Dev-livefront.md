@@ -58,10 +58,6 @@ Powerful features like live code editing, AI assistance, proctoring, plagiarism 
 # 📁 Folder Structure (Deep Detail)
 
 ```bash
-
-# 📁 Folder Structure (Deep Detail)
-
-```bash
 client/
 ├── public/
 ├── src/
