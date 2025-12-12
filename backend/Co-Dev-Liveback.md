@@ -25,62 +25,68 @@ The backend powers real-time collaboration, AI tooling, automated code execution
 # 📁 Backend Folder Structure (Expanded)
 
 
-
 server/
-├── src/
-│   ├── config/
-│   │   ├── db.js        # Mongo connection
-│   │   └── env.js
-│   ├── models/
-│   │   ├── User.js
-│   │   ├── Room.js
-│   │   ├── Message.js
-│   │   ├── Session.js          # Editor session
-│   │   ├── DSAProblem.js
-│   │   ├── Submission.js       # Raw code submissions
-│   │   ├── Plagiarism.js
-│   │   └── AIReview.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── roomController.js
-│   │   ├── codeController.js
-│   │   ├── chatController.js
-│   │   ├── dsaController.js
-│   │   ├── aiController.js
-│   │   ├── resumeController.js
-│   │   ├── plagiarismController.js
-│   │   ├── proctoringController.js
-│   │   └── adminController.js
-│   ├── routes/
-│   │   ├── authRoutes.js
-│   │   ├── roomRoutes.js
-│   │   ├── codeRoutes.js
-│   │   ├── chatRoutes.js
-│   │   ├── dsaRoutes.js
-│   │   ├── aiRoutes.js
-│   │   ├── resumeRoutes.js
-│   │   ├── plagiarismRoutes.js
-│   │   ├── proctoringRoutes.js
-│   │   └── adminRoutes.js
-│   ├── sockets/
-│   │   ├── editorSocket.js
-│   │   ├── chatSocket.js
-│   │   ├── proctoringSocket.js
-│   │   └── notificationSocket.js
-│   ├── middlewares/
-│   │   ├── authMiddleware.js
-│   │   ├── roleMiddleware.js
-│   │   └── errorHandler.js
-│   ├── utils/
-│   │   ├── normalizeCode.js
-│   │   ├── plagiarismCheck.js
-│   │   ├── aiHelper.js
-│   │   ├── codeRunner.js
-│   │   └── logger.js
-│   ├── server.js
-│   └── app.js
-├── package.json
-└── README.md
+└── src/
+    ├── config/
+    │   ├── db.js               # Mongo connection
+    │   └── env.js
+    │
+    ├── models/
+    │   ├── User.js
+    │   ├── Room.js
+    │   ├── Message.js
+    │   ├── Session.js          # Editor session
+    │   ├── DSAProblem.js
+    │   ├── Submission.js       # Raw code submissions
+    │   └── Plagiarism.js
+    │
+    ├── controllers/
+    │   ├── authController.js
+    │   ├── roomController.js
+    │   ├── codeController.js
+    │   ├── chatController.js
+    │   ├── dsaController.js
+    │   ├── aiController.js
+    │   ├── resumeController.js
+    │   ├── plagiarismController.js
+    │   ├── proctoringController.js
+    │   └── adminController.js
+    │
+    ├── routes/
+    │   ├── authRoutes.js
+    │   ├── roomRoutes.js
+    │   ├── codeRoutes.js
+    │   ├── chatRoutes.js
+    │   ├── dsaRoutes.js
+    │   ├── aiRoutes.js
+    │   ├── resumeRoutes.js
+    │   ├── plagiarismRoutes.js
+    │   ├── proctoringRoutes.js
+    │   └── adminRoutes.js
+    │
+    ├── sockets/
+    │   ├── editorSocket.js
+    │   ├── chatSocket.js
+    │   ├── proctoringSocket.js
+    │   └── notificationSocket.js
+    │
+    ├── middlewares/
+    │   ├── authMiddleware.js
+    │   ├── roleMiddleware.js
+    │   └── errorHandler.js
+    │
+    ├── utils/
+    │   ├── normalizeCode.js
+    │   ├── plagiarismCheck.js
+    │   ├── aiHelper.js
+    │   ├── codeRunner.js
+    │   └── logger.js
+    │
+    ├── server.js
+    └── app.js
+
+package.json
+README.md
 
 
 ---
