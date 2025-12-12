@@ -58,62 +58,6 @@ Powerful features like live code editing, AI assistance, proctoring, plagiarism 
 # 📁 Folder Structure (Deep Detail)
 
 ```bash
-# 🌐 CodevLive — Frontend Documentation (Complete)
-
-CodevLive is a real-time collaborative coding and learning platform built for:
-✔ Students  
-✔ Teachers  
-✔ Interviewers  
-✔ Developers  
-
-Powerful features like live code editing, AI assistance, proctoring, plagiarism detection, DSA tracker, and interview mode make it a full ecosystem for coding education and assessments.
-
----
-
-# 🚀 Frontend Tech Stack
-
-| Technology | Why it’s used |
-|------------|---------------|
-| **React (Vite)** | Fast bundling, modern DX |
-| **TailwindCSS** | Professional design, component speed |
-| **shadcn/UI** | Modern UI components with accessibility |
-| **Monaco Editor** | Same editor used in VS Code |
-| **Socket.io Client** | Real-time sync for editor + chat |
-| **Axios** | API calls |
-| **React Router** | Page navigation |
-| **Zustand / Context API** | Lightweight global state mgmt |
-| **Lucide Icons** | Clean icon pack |
-| **Framer Motion** | Page & UI animations |
-| **WebRTC** | Video calling for interview mode |
-| **LocalStorage** | Draft auto-saving |
-
----
-
-# 🎨 UI Theme & Design Guide
-
-## Color Palette
-| Purpose | Color |
-|---------|--------|
-| Primary | `#3B82F6` (Blue) |
-| Secondary | `#1E293B` (Slate Dark) |
-| Background (Light) | `#F9FAFB` |
-| Background (Dark) | `#0F172A` |
-| Success | `#10B981` |
-| Danger | `#EF4444` |
-
-## Typography
-- **Editor Font**: JetBrains Mono / Fira Code  
-- **UI Font**: Inter / Poppins  
-
-## Design Philosophy
-- Minimal & clean  
-- Professional SaaS look  
-- Easy for teachers & interviewers  
-- Comfortable for students  
-- High contrast for coding environments  
-- Dark mode first  
-
----
 
 # 📁 Folder Structure (Deep Detail)
 
