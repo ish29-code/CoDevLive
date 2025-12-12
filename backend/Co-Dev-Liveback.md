@@ -24,7 +24,7 @@ The backend powers real-time collaboration, AI tooling, automated code execution
 
 # 📁 Backend Folder Structure (Expanded)
 
-
+```bash
 server/
 └── src/
     ├── config/
@@ -88,7 +88,7 @@ server/
 package.json
 README.md
 
-
+```
 ---
 
 # 🧠 Detailed Controller Responsibilities
