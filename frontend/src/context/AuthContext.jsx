@@ -1,6 +1,14 @@
-// src/context/AuthContext.js
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { login as loginService, signup as signupService } from "../services/authService";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  signInWithPopup,
+  sendPasswordResetEmail,
+  updateProfile,
+} from "firebase/auth";
+import { auth, googleProvider, githubProvider } from "../firebase";
 
 const AuthContext = createContext();
 
@@ -8,65 +16,56 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // if redirected back with token, save it
-useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get("token");
-  if (token) {
-    localStorage.setItem("token", token);
-
-    // fetch user profile right away
-    fetch("http://localhost:5000/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && !data.message) {
-          localStorage.setItem("user", JSON.stringify(data));
-          setUser(data);
-        }
-      })
-      .catch((err) => console.error("Failed to fetch user:", err));
-
-    window.history.replaceState({}, document.title, "/"); // clean URL
-  }
-}, []);
-
-
-  // Load user from localStorage on refresh
+  // keep user logged in even after refresh
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const currentUser = {
+          id: fbUser.uid,
+          email: fbUser.email,
+          fullName: fbUser.displayName || "",
+          photoURL: fbUser.photoURL || "",
+        };
+        setUser(currentUser);
+        localStorage.setItem("user", JSON.stringify(currentUser));
+
+        const token = await fbUser.getIdToken();
+        localStorage.setItem("token", token);
+      } else {
+        setUser(null);
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  
+  // email/password login
+  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  const login = async (email, password) => {
-    const res = await loginService({ email, password });
-    localStorage.setItem("token", res.token);
-    localStorage.setItem("user", JSON.stringify(res.user));
-    setUser(res.user);
-    return res.user;
+  // signup
+  const signup = async (fullName, email, password) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: fullName });
+    return cred.user;
   };
 
-  const signup = async (name, email, password) => {
-    const res = await signupService({ name, email, password });
-    // after signup, we don't auto login
-    return res;
-  };
+  // forgot password
+  const resetPassword = (email) => sendPasswordResetEmail(auth, email);
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
-  };
+  // logout
+  const logout = () => signOut(auth);
+
+  // Google + GitHub popup login
+  const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
+  const loginWithGitHub = () => signInWithPopup(auth, githubProvider);
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, signup, resetPassword, logout, loginWithGoogle, loginWithGitHub }}
+    >
       {children}
     </AuthContext.Provider>
   );
