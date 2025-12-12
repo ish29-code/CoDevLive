@@ -187,6 +187,14 @@ Just **"CodevLive"**, Login & Signup buttons.
 - Matched submissions  
 - Side-by-side diff  
 
+### 🛠 Admin Panel
+- Admins can:
+- View analytics
+- Manage users
+- Ban accounts
+- Delete rooms or submissions
+- Monitor plagiarism cases
+
 ---
 
 # ✔ Why This Frontend Is Professional
