@@ -1,3 +1,5 @@
+
+
 import React, { useState } from "react";
 import { Button } from "../components/ui/button";
 import {
@@ -6,21 +8,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
-import { Sun, Moon, Menu, X, User } from "lucide-react";
+import { Sun, Moon, Menu, X, User, ChevronDown } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
 import { features } from "@/data/features";
 
-
-
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  // 🔹 Feature list with routes
-  
+  const [featuresOpen, setFeaturesOpen] = useState(false); // ✅ NEW
 
   const profileFeatures = [
     { label: "Profile", path: "/profile" },
@@ -39,7 +37,7 @@ const Navbar = () => {
           <Link to="/" className="nav-link">Home</Link>
           <Link to="/about" className="nav-link">About</Link>
 
-          {/* Features */}
+          {/* Desktop Features Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="nav-link">
@@ -129,20 +127,46 @@ const Navbar = () => {
             <Link to="/" onClick={() => setMenuOpen(false)}>Home</Link>
             <Link to="/about" onClick={() => setMenuOpen(false)}>About</Link>
 
-            {features.map((item, i) => (
-              <Link
-                key={i}
-                to={item.path}
-                onClick={() => setMenuOpen(false)}
+            {/* ✅ Mobile Features Dropdown */}
+            <div>
+              <button
+                onClick={() => setFeaturesOpen(!featuresOpen)}
+                className="w-full flex justify-between items-center font-medium"
               >
-                {item.label}
-              </Link>
-            ))}
+                Features
+                <ChevronDown
+                  size={18}
+                  className={`transition-transform ${featuresOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {featuresOpen && (
+                <div className="ml-4 mt-2 flex flex-col gap-2">
+                  {features.map((item, i) => (
+                    <Link
+                      key={i}
+                      to={item.path}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setFeaturesOpen(false);
+                      }}
+                      className="text-sm text-muted-foreground"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {!user ? (
               <>
-                <Link to="/authpage"><Button>Login</Button></Link>
-                <Link to="/authpage"><Button>Sign Up</Button></Link>
+                <Link to="/authpage">
+                  <Button>Login</Button>
+                </Link>
+                <Link to="/authpage">
+                  <Button>Sign Up</Button>
+                </Link>
               </>
             ) : (
               <Button onClick={logout}>Logout</Button>
@@ -155,3 +179,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
