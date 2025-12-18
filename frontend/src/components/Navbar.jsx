@@ -1,5 +1,3 @@
-
-
 import React, { useState } from "react";
 import { Button } from "../components/ui/button";
 import {
@@ -18,7 +16,7 @@ const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [featuresOpen, setFeaturesOpen] = useState(false); // ✅ NEW
+  const [featuresOpen, setFeaturesOpen] = useState(false); 
 
   const profileFeatures = [
     { label: "Profile", path: "/profile" },
