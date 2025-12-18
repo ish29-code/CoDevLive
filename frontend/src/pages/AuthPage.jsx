@@ -15,6 +15,10 @@ export default function AuthPage() {
     useAuth();
 
   const navigate = useNavigate();
+  const inputClass =
+    theme === "light"
+      ? "text-black placeholder:text-gray-500"
+      : "text-white placeholder:text-gray-400";
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -75,7 +79,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--gradient-start)] via-[var(--background)] to-[var(--gradient-end)]">
+    <div className={`flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--gradient-start)] via-[var(--background)] to-[var(--gradient-end)] ${theme === "light" ? "text-black" : "text-white"}`}>
       <Card className="w-full max-w-md p-6 shadow-xl border-[var(--border)] bg-[var(--card)]">
         <CardHeader>
           <CardTitle className="text-2xl text-center text-[var(--accent)]">
@@ -104,13 +108,14 @@ export default function AuthPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className={`space-y-4 ${theme === "light" ? "text-black" : "text-white"}`}>
             {isReset ? (
               <>
                 <Input
                   type="email"
                   placeholder="Enter your email"
                   value={email}
+                  className={inputClass}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
@@ -124,6 +129,7 @@ export default function AuthPage() {
                   <Input
                     type="text"
                     placeholder="Full Name"
+                    className={inputClass}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -133,6 +139,7 @@ export default function AuthPage() {
                 <Input
                   type="email"
                   placeholder="Email"
+                  className={inputClass}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -143,6 +150,7 @@ export default function AuthPage() {
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Password"
+                    className={inputClass}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -162,6 +170,7 @@ export default function AuthPage() {
                     <Input
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="Confirm Password"
+                      className={inputClass}
                       value={confirmPassword}
                       onChange={(e) =>
                         setConfirmPassword(e.target.value)
