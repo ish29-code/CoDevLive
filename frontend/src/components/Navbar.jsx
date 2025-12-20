@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "../components/ui/dropdown-menu";
-import { Sun, Moon, Menu, X, User, ChevronDown } from "lucide-react";
+import { Sun, Moon, Menu, X, User, ChevronDown, Settings, LogOut, Laptop } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
@@ -20,8 +20,8 @@ const Navbar = () => {
   const [featuresOpen, setFeaturesOpen] = useState(false);
 
   const profileFeatures = [
-    { label: "Profile", path: "/profile" },
-    { label: "Settings", path: "/settings" },
+    { label: "Profile", path: "/profile", icon: User },
+    { label: "Settings", path: "/settings", icon: Settings },
   ];
 
   return (
@@ -65,15 +65,17 @@ const Navbar = () => {
                   />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-[var(--card)] border">
+              <DropdownMenuContent className={theme === "light" ? "bg-white border border-gray-200" : "bg-black border border-gray-700 text-white"}>
                 {profileFeatures.map((item, i) => (
                   <DropdownMenuItem key={i} asChild>
                     <Link to={item.path} className="w-full cursor-pointer">
+                      <item.icon className={`w-5 h-5 ${theme === "light" ? "text-gray-700" : "text-white"} mr-2`} />
                       {item.label}
                     </Link>
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem className="text-red-600" onClick={logout}>
+                  <LogOut className={`w-5 h-5 mr-2 ${theme === "light" ? "text-gray-700" : "text-white"}`} />
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -120,13 +122,16 @@ const Navbar = () => {
                 className="bg-[var(--card)] border w-44"
               >
                 <DropdownMenuItem asChild>
-                  <Link to="/profile" onClick={() => setMenuOpen(false)}>
+
+                  <Link to="/profile" className={`${theme === "light" ? "text-black" : "text-white"}`} onClick={() => setMenuOpen(false)}>
+                    <User className={`w-5 h-5 ${theme === "light" ? "text-gray-700" : "text-white"} mr-2`} />
                     Profile
                   </Link>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem asChild>
-                  <Link to="/settings" onClick={() => setMenuOpen(false)}>
+                  <Link to="/settings" className={`${theme === "light" ? "text-black" : "text-white"}`} onClick={() => setMenuOpen(false)}>
+                    <Settings className={`w-5 h-5 ${theme === "light" ? "text-gray-700" : "text-white"} mr-2`} />
                     Settings
                   </Link>
                 </DropdownMenuItem>
@@ -138,6 +143,7 @@ const Navbar = () => {
                   }}
                   className="text-red-600"
                 >
+                  <LogOut className={`w-5 h-5 ${theme === "light" ? "text-gray-700" : "text-white"} mr-2`} />
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
