@@ -20,7 +20,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
-import { features } from "../data/features";
+import { features } from "@/data/features";
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();

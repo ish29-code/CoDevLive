@@ -120,7 +120,7 @@ export default function Profile() {
               }
               className="max-w-xs"
             />
-          )}function
+          )}
         </div>
 
         {/* Fields */}
