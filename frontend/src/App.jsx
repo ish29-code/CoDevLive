@@ -8,6 +8,7 @@ import About from "./pages/About";
 import AuthPage from "./pages/AuthPage";
 import Profile from "./pages/Profile";
 
+
 const App = () => {
   return (
     <ThemeProvider>
@@ -18,7 +19,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/authpage" element={<AuthPage />} />
-            <Route path="/profile" element={<Profile/>} />
+            <Route path="/profile" element={<Profile />} />
           </Routes>
         </main>
         <Footer />

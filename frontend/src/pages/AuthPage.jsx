@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Github, Mail, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -35,26 +36,26 @@ export default function AuthPage() {
     try {
       if (isReset) {
         await resetPassword(email);
-        alert(`📧 Password reset link sent to ${email}`);
         setIsReset(false);
+        toast.success("Password reset link sent to your email!");
         return;
       }
 
       if (isLogin) {
         await login(email, password);
-        alert("✅ Logged in successfully!");
+        toast.success("Logged in successfully!");
         navigate("/");
       } else {
         if (password !== confirmPassword) {
-          alert("❌ Passwords do not match");
+          toast.error("Passwords do not match");
           return;
         }
         await signup(fullName, email, password);
-        alert("✅ Account created! Please login.");
+        toast.success("Account created! Please login.");
         setIsLogin(true);
       }
     } catch (err) {
-      alert(err.message || "Something went wrong");
+      toast.error(`${err.message}`);
     }
   };
 
@@ -62,9 +63,10 @@ export default function AuthPage() {
   const handleGoogle = async () => {
     try {
       await loginWithGoogle();
+      toast.success("Logged in with Google!");
       navigate("/");
     } catch {
-      alert("❌ Google Sign-in failed");
+      toast.error("Google Sign-in failed");
     }
   };
 
@@ -72,9 +74,10 @@ export default function AuthPage() {
   const handleGithub = async () => {
     try {
       await loginWithGitHub();
+      toast.success("Logged in with GitHub!");
       navigate("/");
     } catch {
-      alert("❌ GitHub Sign-in failed");
+      toast.error("GitHub Sign-in failed");
     }
   };
 
