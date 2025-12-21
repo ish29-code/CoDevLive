@@ -17,6 +17,8 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null); // app user profile object
   const [loading, setLoading] = useState(true);
 
+
+
   // On mount: if token in localStorage, fetch profile from backend (if you use backend)
   useEffect(() => {
     const init = async () => {
@@ -30,10 +32,20 @@ export const AuthProvider = ({ children }) => {
     init();
   }, []);
 
+  // 🔹 Update user fields (photo, name, etc)
+  const updateUser = (updatedFields) => {
+    setUser((prev) => {
+      const newUser = { ...prev, ...updatedFields };
+      localStorage.setItem("user", JSON.stringify(newUser));
+      return newUser;
+    });
+  };
   // ---------- Email / Password via your backend (existing) ----------
   const login = async (email, password) => {
     // keep using your existing backend service
     const res = await loginService({ email, password }); // expects { email, password }
+
+
     // backend returns { token, user }
     localStorage.setItem("token", res.token);
     localStorage.setItem("user", JSON.stringify(res.user));
@@ -140,6 +152,7 @@ export const AuthProvider = ({ children }) => {
         resetPassword,
         firebaseEmailSignUp,
         firebaseEmailLogin,
+        updateUser,
       }}
     >
       {children}

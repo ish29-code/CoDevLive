@@ -25,11 +25,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["user", "admin", "interviewer"],
       default: "user",
-    },
-    avatar: {
-      type: String, // profile picture url
-      default: "",
-    },
+    }
   },
   { timestamps: true }
 );

@@ -5,18 +5,22 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { SKILLS } from "@/data/skills";
+import { useAuth } from "../context/AuthContext";
+
 
 export default function Profile() {
   const { theme } = useTheme();
   const [editMode, setEditMode] = useState(false);
+  const { updateUser } = useAuth();
+
 
   const [profile, setProfile] = useState({
-    name: "Your Name",
-    school: "Your School",
-    college: "Your College",
-    location: "Your City, Country",
-    bio: "Write something about yourself...",
-    skills: ["React", "Node.js"],
+    name: "",
+    school: "",
+    college: "",
+    location: "",
+    bio: "",
+    skills: [],
     linkedin: "",
     github: "",
     twitter: "",
@@ -33,10 +37,53 @@ export default function Profile() {
     setProfile({ ...profile, [e.target.name]: e.target.value });
   };
 
-  const handleSave = () => {
-    setEditMode(false);
-    toast.success("Profile updated successfully ✨");
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please login again");
+        return;
+      }
+
+      const formData = new FormData();
+
+      // text fields
+      formData.append("name", profile.name);
+      formData.append("school", profile.school);
+      formData.append("college", profile.college);
+      formData.append("location", profile.location);
+      formData.append("bio", profile.bio);
+      formData.append("linkedin", profile.linkedin);
+      formData.append("github", profile.github);
+      formData.append("twitter", profile.twitter);
+      formData.append("skills", JSON.stringify(profile.skills));
+
+      // files
+      if (profile.photo) formData.append("photo", profile.photo);
+      if (profile.resume) formData.append("resume", profile.resume);
+
+      const res = await fetch("http://localhost:5000/api/profile/me", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`, // ✅ REQUIRED
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update profile");
+      }
+
+      const data = await res.json();
+      toast.success("Profile updated successfully ✨");
+      setEditMode(false);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
+
+
 
   const handleSkillInput = (e) => {
     const value = e.target.value;
