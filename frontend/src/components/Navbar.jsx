@@ -34,7 +34,7 @@ const Navbar = () => {
   ];
 
   // 🔹 Reusable Avatar
-  const ProfileAvatar = ({ size = "w-30 h-30" }) =>
+  const ProfileAvatar = ({ size = "w-12 h-12" }) =>
     user?.photoURL ? (
       <img
         src={user.photoURL}
@@ -43,7 +43,7 @@ const Navbar = () => {
       />
     ) : (
       <UserCircle2
-        size={40}
+        size={30}
         className={`w-30 h-30 ${theme === "light" ? "text-gray-800" : "text-white"}`}
       />
     );
@@ -166,94 +166,114 @@ const Navbar = () => {
           )}
 
           <Button variant="ghost" onClick={toggleTheme}>
-            {theme === "light" ? <Sun size={20} /> : <Moon size={20} />}
+            {theme === "light" ? (
+              <Sun size={20} className="text-gray-800" />
+            ) : (
+              <Moon size={20} className="text-white" />
+            )}
           </Button>
 
           <Menu
             onClick={() => setMenuOpen(true)}
-            className={theme === "dark" ? "text-white" : "text-black"}
+            className={`cursor-pointer ${theme === "dark" ? "text-white" : "text-black"}`}
           />
         </div>
       </div>
 
       {/* ================= Mobile Sidebar ================= */}
-      {menuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50">
-          <div
-            className={`w-72 h-full p-6 flex flex-col shadow-2xl border-r border-[var(--border)]
-            ${theme === "light"
-                ? "bg-gradient-to-b from-yellow-50 via-white to-yellow-100"
-                : "bg-gradient-to-b from-black via-[#1a1a1a] to-orange-950"
-              }`}
-          >
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-lg text-[var(--foreground)]">Menu</h2>
-              <X onClick={() => setMenuOpen(false)} />
-            </div>
-
-            {/* Links */}
-            <Link to="/" onClick={() => setMenuOpen(false)} className="nav-link">Home</Link>
-            <Link to="/about" onClick={() => setMenuOpen(false)} className="nav-link">About</Link>
-
-            {/* Features */}
-            <div className="mt-4 flex-1">
-              <button
-                onClick={() => setFeaturesOpen(!featuresOpen)}
-                className="w-full flex justify-between items-center font-medium px-2 py-2"
-              >
-                Features
-                <ChevronDown
-                  size={18}
-                  className={`transition-transform ${featuresOpen ? "rotate-180" : ""}`}
+      {
+        menuOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50">
+            <div
+              className={`
+              w-72 h-full p-6
+              border-r border-[var(--border)]
+              shadow-2xl flex flex-col
+              ${theme === "light"
+                  ? "bg-gradient-to-b from-yellow-50 via-white to-yellow-100"
+                  : "bg-gradient-to-b from-black via-zinc-900 to-orange-950"}
+            `}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="font-bold text-lg text-[var(--foreground)]">Menu</h2>
+                <X onClick={() => setMenuOpen(false)}
+                  className={`cursor-pointer ${theme === "dark" ? "text-white" : "text-black"}`}
                 />
-              </button>
+              </div>
 
-              {featuresOpen && (
-                <div className="mt-2 ml-2 pl-3 border-l border-[var(--border)] max-h-[55vh] overflow-y-auto space-y-2 pr-2">
-                  {features.map((item, i) => (
-                    <Link
-                      key={i}
-                      to={item.path}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setFeaturesOpen(false);
-                      }}
-                      className={`block text-sm ${theme === "light"
-                        ? "text-gray-600 hover:text-yellow-600"
-                        : "text-white hover:text-orange-400"
-                        }`}
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+              {/* Links */}
+              <Link to="/" onClick={() => setMenuOpen(false)} className="nav-link">Home</Link>
+              <Link to="/about" onClick={() => setMenuOpen(false)} className="nav-link">About</Link>
 
-            {/* Auth Section */}
-            <div className="pt-4 border-t border-[var(--border)] space-y-3">
-              {!user ? (
-                <>
-                  <Link to="/authpage"><Button className="w-full btn-outline">Login</Button></Link>
-                  <Link to="/authpage"><Button className="w-full btn-primary">Sign Up</Button></Link>
-                </>
-              ) : (
-                <Button
-                  onClick={logout}
-                  className={`w-full font-semibold ${theme === "light"
-                    ? "bg-yellow-400 hover:bg-yellow-500 text-black"
-                    : "bg-orange-600 hover:bg-orange-700 text-white"
-                    }`}
+              {/* Features */}
+              <div className="mt-4 flex-1">
+                <button
+                  onClick={() => setFeaturesOpen(!featuresOpen)}
+                  className={`
+                  w-full flex justify-between items-center
+                  px-2 py-2 rounded-md font-medium transition
+                  ${theme === "light"
+                      ? "text-black hover:bg-yellow-200"
+                      : "text-white hover:bg-orange-900"}
+                  hover:bg-black/5 dark:hover:bg-white/10
+                `}
                 >
-                  Logout
-                </Button>
-              )}
+                  <span>Features</span>
+                  <ChevronDown
+                    size={18}
+                    className={`transition-transform ${featuresOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {featuresOpen && (
+                  <div className="mt-2 ml-2 pl-3 border-l border-[var(--border)] max-h-[55vh] overflow-y-auto space-y-2 pr-2">
+                    {features.map((item, i) => (
+                      <Link
+                        key={i}
+                        to={item.path}
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setFeaturesOpen(false);
+                        }}
+                        className={`
+                        block text-sm transition
+                        ${theme === "dark"
+                            ? "text-white hover:text-orange-400"
+                            : "text-[var(--muted-foreground)] hover:text-yellow-600"}
+                      `}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Auth Section */}
+              <div className="pt-4 border-t border-[var(--border)] space-y-3">
+                {!user ? (
+                  <>
+                    <Link to="/authpage"><Button className="w-full btn-outline">Login</Button></Link>
+                    <Link to="/authpage"><Button className="w-full btn-primary">Sign Up</Button></Link>
+                  </>
+                ) : (
+                  <Button
+                    onClick={logout}
+                    className={`w-full font-semibold ${theme === "light"
+                      ? "bg-yellow-400 hover:bg-yellow-500 text-black"
+                      : "bg-orange-600 hover:bg-orange-700 text-white"
+                      }`}
+                  >
+                    Logout
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </nav>
+        )
+      }
+    </nav >
   );
 };
 

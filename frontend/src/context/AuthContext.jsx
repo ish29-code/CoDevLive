@@ -14,25 +14,49 @@ import { login as loginService, signup as signupService } from "../services/auth
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // app user profile object
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-
-
-  // On mount: if token in localStorage, fetch profile from backend (if you use backend)
+  /* =====================================================
+     🔥 RESTORE USER + PROFILE (PHOTO, NAME) ON APP LOAD
+     ===================================================== */
   useEffect(() => {
     const init = async () => {
       const token = localStorage.getItem("token");
       const savedUser = localStorage.getItem("user");
+
       if (token && savedUser) {
-        setUser(JSON.parse(savedUser));
+        const baseUser = JSON.parse(savedUser);
+
+        try {
+          // 🔹 Fetch profile from backend
+          const res = await fetch("http://localhost:5000/api/profile/me", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (res.ok) {
+            const profile = await res.json();
+
+            baseUser.photoURL = profile.photo || "";
+            baseUser.name = profile.name || baseUser.name;
+          }
+        } catch (err) {
+          console.error("Profile restore failed:", err);
+        }
+
+        setUser(baseUser);
+        localStorage.setItem("user", JSON.stringify(baseUser));
       }
+
       setLoading(false);
     };
+
     init();
   }, []);
 
-  // 🔹 Update user fields (photo, name, etc)
+  /* ================= UPDATE USER (PHOTO / NAME) ================= */
   const updateUser = (updatedFields) => {
     setUser((prev) => {
       const newUser = { ...prev, ...updatedFields };
@@ -40,102 +64,116 @@ export const AuthProvider = ({ children }) => {
       return newUser;
     });
   };
-  // ---------- Email / Password via your backend (existing) ----------
+
+  /* ================= EMAIL / PASSWORD LOGIN ================= */
   const login = async (email, password) => {
-    // keep using your existing backend service
-    const res = await loginService({ email, password }); // expects { email, password }
+    const res = await loginService({ email, password });
 
-
-    // backend returns { token, user }
     localStorage.setItem("token", res.token);
     localStorage.setItem("user", JSON.stringify(res.user));
     setUser(res.user);
+
     return res.user;
   };
 
   const signup = async (name, email, password) => {
-    // use your backend signup (keeps manual registration)
     const res = await signupService({ fullName: name, email, password });
     return res;
   };
 
+  /* ================= LOGOUT ================= */
   const logout = async () => {
-    // clear local storage
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     setUser(null);
 
-    // also sign out from Firebase if used
-    try { await signOut(auth); } catch (err) { /* ignore */ }
+    try {
+      await signOut(auth);
+    } catch (err) { }
   };
 
-  // ---------- Firebase social login helpers ----------
-  // We use signInWithPopup (dev-friendly). After successful Firebase sign-in we can:
-  // - store the Firebase ID token in localStorage, and optionally send it to backend to create/find user in DB.
+  /* ================= SOCIAL LOGIN ================= */
   const handleSocialSignIn = async (provider) => {
     const result = await signInWithPopup(auth, provider);
     const firebaseUser = result.user;
     const idToken = await getIdToken(firebaseUser);
 
-    // Store token for frontend usage
     localStorage.setItem("token", idToken);
 
-    // Optionally: send idToken to backend to create / fetch user profile and persist in DB
-    // Example endpoint: POST /api/auth/firebase-login { idToken }
     try {
       const resp = await fetch("http://localhost:5000/api/auth/firebase-login", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({}),
       });
+
       const data = await resp.json();
+
       if (data?.success && data.user) {
         localStorage.setItem("user", JSON.stringify(data.user));
         setUser(data.user);
         return data.user;
-      } else {
-        // if backend not used, we can still set a minimal profile from Firebase
-        const smallProfile = { uid: firebaseUser.uid, email: firebaseUser.email, name: firebaseUser.displayName };
-        localStorage.setItem("user", JSON.stringify(smallProfile));
-        setUser(smallProfile);
-        return smallProfile;
       }
     } catch (err) {
-      // fallback: set minimal firebase profile
-      const smallProfile = { uid: firebaseUser.uid, email: firebaseUser.email, name: firebaseUser.displayName };
-      localStorage.setItem("user", JSON.stringify(smallProfile));
-      setUser(smallProfile);
-      return smallProfile;
+      console.error("Firebase backend sync failed");
     }
+
+    const fallbackUser = {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      name: firebaseUser.displayName,
+      photoURL: firebaseUser.photoURL,
+    };
+
+    localStorage.setItem("user", JSON.stringify(fallbackUser));
+    setUser(fallbackUser);
+    return fallbackUser;
   };
 
   const loginWithGoogle = () => handleSocialSignIn(googleProvider);
   const loginWithGitHub = () => handleSocialSignIn(githubProvider);
 
-  // ---------- Reset password ----------
+  /* ================= RESET PASSWORD ================= */
   const resetPassword = async (email) => {
     await sendPasswordResetEmail(auth, email);
     return true;
   };
 
-  // Additional helper: sign in with Firebase email/password (optional)
+  /* ================= FIREBASE EMAIL LOGIN ================= */
   const firebaseEmailSignUp = async (email, password) => {
     const res = await createUserWithEmailAndPassword(auth, email, password);
     const idToken = await getIdToken(res.user);
+
+    const profile = {
+      uid: res.user.uid,
+      email: res.user.email,
+      name: res.user.displayName,
+    };
+
     localStorage.setItem("token", idToken);
-    const profile = { uid: res.user.uid, email: res.user.email, name: res.user.displayName };
     localStorage.setItem("user", JSON.stringify(profile));
     setUser(profile);
+
     return profile;
   };
 
   const firebaseEmailLogin = async (email, password) => {
     const res = await signInWithEmailAndPassword(auth, email, password);
     const idToken = await getIdToken(res.user);
+
+    const profile = {
+      uid: res.user.uid,
+      email: res.user.email,
+      name: res.user.displayName,
+    };
+
     localStorage.setItem("token", idToken);
-    const profile = { uid: res.user.uid, email: res.user.email, name: res.user.displayName };
     localStorage.setItem("user", JSON.stringify(profile));
     setUser(profile);
+
     return profile;
   };
 

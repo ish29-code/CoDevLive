@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,13 @@ import { X } from "lucide-react";
 import { SKILLS } from "@/data/skills";
 import { useAuth } from "../context/AuthContext";
 
-
 export default function Profile() {
   const { theme } = useTheme();
+  const { updateUser, user } = useAuth();
   const [editMode, setEditMode] = useState(false);
-  const { updateUser } = useAuth();
+  const [loading, setLoading] = useState(true); // ✅ ADDED
 
-
+  // ✅ Persistent profile state (URLs)
   const [profile, setProfile] = useState({
     name: "",
     school: "",
@@ -24,12 +24,83 @@ export default function Profile() {
     linkedin: "",
     github: "",
     twitter: "",
-    photo: null,
-    resume: null,
+    photo: "",
+    resume: "",
   });
+
+  // ✅ Temp file states (only while editing)
+  const [photoFile, setPhotoFile] = useState(null);
+  const [resumeFile, setResumeFile] = useState(null);
 
   const [skillInput, setSkillInput] = useState("");
   const [suggestions, setSuggestions] = useState([]);
+
+  /* ================= LOAD PROFILE ON REFRESH ================= */
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch("http://localhost:5000/api/profile/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          setProfile({
+            name: data.name || "",
+            school: data.school || "",
+            college: data.college || "",
+            location: data.location || "",
+            bio: data.bio || "",
+            skills: data.skills || [],
+            linkedin: data.linkedin || "",
+            github: data.github || "",
+            twitter: data.twitter || "",
+            photo: data.photo || "",
+            resume: data.resume || "",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load profile", err);
+      } finally {
+        setLoading(false); // ✅ ADDED
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  /* ================= CLEAR PROFILE ON LOGOUT ================= */
+  useEffect(() => {
+    if (!user) {
+      setProfile({
+        name: "",
+        school: "",
+        college: "",
+        location: "",
+        bio: "",
+        skills: [],
+        linkedin: "",
+        github: "",
+        twitter: "",
+        photo: "",
+        resume: "",
+      });
+
+      setPhotoFile(null);
+      setResumeFile(null);
+      setEditMode(false);
+      setSkillInput("");
+      setSuggestions([]);
+    }
+  }, [user]);
 
   /* ================= HANDLERS ================= */
 
@@ -47,7 +118,6 @@ export default function Profile() {
 
       const formData = new FormData();
 
-      // text fields
       formData.append("name", profile.name);
       formData.append("school", profile.school);
       formData.append("college", profile.college);
@@ -58,15 +128,12 @@ export default function Profile() {
       formData.append("twitter", profile.twitter);
       formData.append("skills", JSON.stringify(profile.skills));
 
-      // files
-      if (profile.photo) formData.append("photo", profile.photo);
-      if (profile.resume) formData.append("resume", profile.resume);
+      if (photoFile) formData.append("photo", photoFile);
+      if (resumeFile) formData.append("resume", resumeFile);
 
       const res = await fetch("http://localhost:5000/api/profile/me", {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`, // ✅ REQUIRED
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -76,14 +143,27 @@ export default function Profile() {
       }
 
       const data = await res.json();
-      toast.success("Profile updated successfully ✨");
+
+      setProfile((prev) => ({
+        ...prev,
+        photo: data.photo || prev.photo,
+        resume: data.resume || prev.resume,
+      }));
+
+      updateUser({
+        name: data.name,
+        photoURL: data.photo,
+      });
+
+      setPhotoFile(null);
+      setResumeFile(null);
       setEditMode(false);
+
+      toast.success("Profile updated successfully ✨");
     } catch (err) {
       toast.error(err.message);
     }
   };
-
-
 
   const handleSkillInput = (e) => {
     const value = e.target.value;
@@ -116,11 +196,41 @@ export default function Profile() {
     });
   };
 
+  /* ================= LOADER ================= */
+  if (loading) {
+    const isLight = theme === "light";
+
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          background: `linear-gradient(
+          to bottom right,
+          var(--gradient-start),
+          var(--gradient-end)
+        )`,
+        }}
+      >
+        <div
+          className={`
+          w-[100px] h-[100px] border-4 rounded-full animate-spin
+          border-[var(--accent)]
+          border-t-transparent
+        `}
+        />
+      </div>
+    );
+  }
+
+
+
   /* ================= UI ================= */
+
+
 
   return (
     <div className="
-      min-h-screen flex items-center justify-center px-4
+      min-h-screen flex items-center justify-center px-3 py-10
       bg-gradient-to-br from-[var(--gradient-start)] to-[var(--gradient-end)]
     ">
       <div className="
@@ -149,24 +259,14 @@ export default function Profile() {
             border border-[var(--border)] flex items-center justify-center overflow-hidden
           ">
             {profile.photo ? (
-              <img
-                src={URL.createObjectURL(profile.photo)}
-                className="w-full h-full object-cover"
-              />
+              <img src={profile.photo} alt="profile" className="w-full h-full object-cover" />
             ) : (
               <span className="text-sm opacity-70">Upload Photo</span>
             )}
           </div>
 
           {editMode && (
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={(e) =>
-                setProfile({ ...profile, photo: e.target.files[0] })
-              }
-              className="max-w-xs"
-            />
+            <Input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files[0])} className="max-w-xs" />
           )}
         </div>
 
@@ -190,34 +290,24 @@ export default function Profile() {
         <div className="mt-6">
           <label className="font-medium mb-2 block">Skills</label>
 
-          {/* Skill Chips */}
           <div className="flex flex-wrap gap-2 mb-3">
             {profile.skills.map((skill) => (
               <span
                 key={skill}
                 className={`
                   flex items-center gap-1 px-3 py-1 rounded-full text-sm
-                  ${theme === "light"
-                    ? "bg-yellow-200 text-black"
-                    : "bg-orange-500 text-white"}
+                  ${theme === "light" ? "bg-yellow-200 text-black" : "bg-orange-500 text-white"}
                 `}
               >
                 {skill}
-                {editMode && (
-                  <X size={14} className="cursor-pointer" onClick={() => removeSkill(skill)} />
-                )}
+                {editMode && <X size={14} className="cursor-pointer" onClick={() => removeSkill(skill)} />}
               </span>
             ))}
           </div>
 
-          {/* Skill Search */}
           {editMode && (
             <div className="relative">
-              <Input
-                value={skillInput}
-                onChange={handleSkillInput}
-                placeholder="Search skills..."
-              />
+              <Input value={skillInput} onChange={handleSkillInput} placeholder="Search skills..." />
 
               {suggestions.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-[var(--card)] border rounded-lg shadow max-h-40 overflow-y-auto">
@@ -225,12 +315,7 @@ export default function Profile() {
                     <button
                       key={skill}
                       onClick={() => addSkill(skill)}
-                      className={`
-                        w-full text-left px-4 py-2 text-sm transition
-                        ${theme === "light"
-                          ? "hover:bg-yellow-100"
-                          : "hover:bg-orange-900"}
-                      `}
+                      className={`${theme === "light" ? "hover:bg-yellow-100" : "hover:bg-orange-900"} w-full text-left px-4 py-2 text-sm`}
                     >
                       {skill}
                     </button>
@@ -245,18 +330,16 @@ export default function Profile() {
         <div className="mt-6">
           <label className="block mb-2 font-medium">Resume</label>
 
-          {editMode ? (
-            <Input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) =>
-                setProfile({ ...profile, resume: e.target.files[0] })
-              }
-            />
+          {profile.resume ? (
+            <a href={profile.resume} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+              Download Resume
+            </a>
           ) : (
-            <p className="text-sm opacity-70">
-              {profile.resume ? profile.resume.name : "No resume uploaded"}
-            </p>
+            <p className="text-sm opacity-70">No resume uploaded</p>
+          )}
+
+          {editMode && (
+            <Input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setResumeFile(e.target.files[0])} className="mt-2" />
           )}
         </div>
       </div>
