@@ -17,6 +17,7 @@ import {
   LogOut,
   UserCircle2
 } from "lucide-react";
+import { assets } from "@/assets/assets";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { Link } from "react-router-dom";
@@ -34,20 +35,21 @@ const Navbar = () => {
   ];
 
   // 🔹 Reusable Avatar
-  const ProfileAvatar = ({ size = "w-12 h-12" }) =>
-    user?.photoURL ? (
+  const ProfileAvatar = ({ size = "w-8 h-8" }) => {
+    return user?.photoURL ? (
       <img
         src={user.photoURL}
         alt="profile"
-        className={`${size} rounded-full object-cover border border-[var(--border)]`}
+        className={`${size} rounded-full object-cover`}
       />
     ) : (
-      <UserCircle2
-        size={30}
-        className={`w-30 h-30 ${theme === "light" ? "text-gray-800" : "text-white"}`}
+      <img
+        src={assets.emptylogo}
+        alt="default avatar"
+        className={`${size} rounded-full object-cover opacity-80`}
       />
     );
-
+  };
   return (
     <nav className="bg-[var(--background)] border-b border-[var(--border)]">
       <div className="container-center flex justify-between items-center py-4">

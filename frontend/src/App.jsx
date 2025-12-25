@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import About from "./pages/About";
 import AuthPage from "./pages/AuthPage";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 
 
 const App = () => {
@@ -20,6 +21,7 @@ const App = () => {
             <Route path="/about" element={<About />} />
             <Route path="/authpage" element={<AuthPage />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
         <Footer />

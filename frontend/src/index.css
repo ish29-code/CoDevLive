@@ -5,32 +5,40 @@
 
 :root {
   /* Light mode colors */
-  --background: #ffffff; /* pure white */
-  --foreground: #1a1a1a; 
-  --accent: #f59e0b; /* warm yellow/orange */
+  --background: #ffffff;
+  /* pure white */
+  --foreground: #1a1a1a;
+  --accent: #f59e0b;
+  /* warm yellow/orange */
   --accent-foreground: #ffffff;
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --border: #e5e7eb;
   --ring: #fbbf24;
   --accent: #eab308;
-  --gradient-start: #fef9c3; /* Light yellow top-left */
-  --gradient-end: #facc15; /* Rich yellow bottom-right */
+  --gradient-start: #fef9c3;
+  /* Light yellow top-left */
+  --gradient-end: #facc15;
+  /* Rich yellow bottom-right */
 }
 
 .dark {
   /* Dark mode colors */
-  --background: #000000; /* pure black */
+  --background: #000000;
+  /* pure black */
   --foreground: #ffffff;
-  --accent: #f97316; /* bright orange */
+  --accent: #f97316;
+  /* bright orange */
   --accent-foreground: #000000;
   --card: #1a1a1a;
   --card-foreground: #ffffff;
   --border: #333333;
   --ring: #fb923c;
-  --accent: #f56629; 
-   --gradient-start: #302f2f; /* Light yellow top-left */
-  --gradient-end: #4b1d07;  /* Yellow bottom-right glow */
+  --accent: #f56629;
+  --gradient-start: #302f2f;
+  /* Light yellow top-left */
+  --gradient-end: #4b1d07;
+  /* Yellow bottom-right glow */
 }
 
 /* Reusable Classes */
@@ -49,4 +57,18 @@
 /* Center page content */
 .container-center {
   @apply max-w-7xl mx-auto px-6;
+}
+
+.settings-card {
+  transition: all 0.3s ease;
+}
+
+.settings-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border-color: var(--accent);
+}
+
+.settings-card:hover * {
+  transition: opacity 0.2s ease;
 }
