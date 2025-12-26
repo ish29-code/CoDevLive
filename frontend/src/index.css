@@ -72,3 +72,11 @@
 .settings-card:hover * {
   transition: opacity 0.2s ease;
 }
+
+.settings-card {
+  transition: all 0.3s ease;
+}
+
+.settings-card:hover {
+  transform: translateY(-2px);
+}

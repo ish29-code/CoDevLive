@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Settings from "../models/Settings.js";
 
 // Helper: generate JWT
 const generateToken = (userId) => {
@@ -67,3 +68,27 @@ export const getMe = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+
+/* ================= DELETE ACCOUNT ================= */
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 1️⃣ Delete user settings
+    await Settings.deleteOne({ userId });
+
+    // 2️⃣ Delete user
+    await User.findByIdAndDelete(userId);
+
+    res.json({
+      success: true,
+      message: "Account deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete account error:", err);
+    res.status(500).json({ message: "Failed to delete account" });
+  }
+};
+

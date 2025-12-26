@@ -59,7 +59,6 @@ export const setup2FA = async () => {
     // expected response:
     // { qrCode: "data:image/png;base64,..." }
 };
-
 /* ================= VERIFY 2FA ================= */
 export const verify2FA = async (otp) => {
     const res = await fetch(`${BASE_URL}/2fa/verify`, {
@@ -77,3 +76,4 @@ export const verify2FA = async (otp) => {
 
     return res.json();
 };
+

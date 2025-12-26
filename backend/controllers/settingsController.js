@@ -25,10 +25,18 @@ export const updateSettings = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        // 🔒 ABSOLUTE BLOCK
+        const {
+            twoFA,          // ❌ ignore
+            _id,
+            userId: uid,    // ❌ ignore
+            ...safeFields
+        } = req.body;
+
         const settings = await Settings.findOneAndUpdate(
             { userId },
-            { $set: req.body },
-            { new: true, upsert: true } // 🔥 THIS IS CRITICAL
+            { $set: safeFields },
+            { new: true, upsert: true }
         );
 
         res.json(settings);
@@ -36,6 +44,8 @@ export const updateSettings = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+
 
 /* ================= SETUP 2FA ================= */
 export const setup2FA = async (req, res) => {
@@ -111,3 +121,5 @@ export const verify2FA = async (req, res) => {
         res.status(500).json({ message: "2FA verification failed" });
     }
 };
+
+

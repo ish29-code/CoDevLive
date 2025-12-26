@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Settings,
   LogOut,
-  UserCircle2
 } from "lucide-react";
 import { assets } from "@/assets/assets";
 import { useTheme } from "../context/ThemeContext";
