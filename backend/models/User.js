@@ -5,9 +5,9 @@ const userSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
-      required: false,
       trim: true,
     },
+
     email: {
       type: String,
       required: true,
@@ -15,31 +15,39 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+
+    // 🔐 Only LOCAL users have password
     password: {
       type: String,
-      required: true,
-      minlength: 6,
-      select: false, // don’t return password by default
+      select: false,
     },
-    role: {
+
+    // 🔑 Auth provider
+    provider: {
       type: String,
-      enum: ["user", "admin", "interviewer"],
-      default: "user",
-    }
+      enum: ["local", "google", "github"],
+      default: "local",
+    },
+
+    // 🔁 Password reset (LOCAL only)
+    resetToken: String,
+    resetTokenExpiry: Date,
   },
   { timestamps: true }
 );
 
-// Hash password before save
+/* ================= HASH PASSWORD ================= */
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password") || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
-// Compare passwords
+/* ================= COMPARE PASSWORD ================= */
+// ✅ REQUIRED for login
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  if (!this.password) return false;
+  return bcrypt.compare(candidatePassword, this.password);
 };
 
 export default mongoose.model("User", userSchema);

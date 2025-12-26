@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Github, Mail, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import Loader from "../components/Loader";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -29,15 +30,17 @@ export default function AuthPage() {
   // 👁️ show / hide states
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   // form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setPasswordLoading(true);
       if (isReset) {
-        await resetPassword(email);
-        setIsReset(false);
+        await resetPassword(email, "local");
         toast.success("Password reset link sent to your email!");
+        setIsReset(false);
         return;
       }
 
@@ -56,6 +59,9 @@ export default function AuthPage() {
       }
     } catch (err) {
       toast.error(`${err.message}`);
+    }
+    finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -80,6 +86,8 @@ export default function AuthPage() {
       toast.error("GitHub Sign-in failed");
     }
   };
+
+  if (passwordLoading) return <Loader />;
 
   return (
     <div className={`flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--gradient-start)] via-[var(--background)] to-[var(--gradient-end)] ${theme === "light" ? "text-black" : "text-white"}`}>

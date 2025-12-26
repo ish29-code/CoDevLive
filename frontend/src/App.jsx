@@ -8,6 +8,7 @@ import About from "./pages/About";
 import AuthPage from "./pages/AuthPage";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import ResetPassword from "./pages/ResetPassword";
 
 
 const App = () => {
@@ -22,6 +23,8 @@ const App = () => {
             <Route path="/authpage" element={<AuthPage />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
           </Routes>
         </main>
         <Footer />

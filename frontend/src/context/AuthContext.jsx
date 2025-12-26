@@ -13,6 +13,7 @@ import {
   login as loginService,
   signup as signupService,
 } from "../services/authService";
+import { forgotPasswordLocal } from "../api/userApi";
 
 const AuthContext = createContext();
 
@@ -78,19 +79,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   /* ================= EMAIL / PASSWORD LOGIN ================= */
+  /* ================= EMAIL / PASSWORD LOGIN ================= */
   const login = async (email, password) => {
-    const res = await firebaseEmailLogin(email, password);
+    try {
+      // ✅ Use BACKEND login for local users
+      const res = await loginService({ email, password });
 
-    const normalized = normalizeUser({
-      ...res.user,
-      name: res.user.fullName,
-    });
+      const normalized = normalizeUser({
+        ...res.user,
+        name: res.user.fullName,
+      });
 
-    localStorage.setItem("token", res.token);
-    localStorage.setItem("user", JSON.stringify(normalized));
-    setUser(normalized);
+      localStorage.setItem("token", res.token);
+      localStorage.setItem("user", JSON.stringify(normalized));
+      setUser(normalized);
 
-    return normalized;
+      return normalized;
+    } catch (err) {
+      console.error("Login failed:", err);
+      throw err;
+    }
   };
 
   const signup = async (name, email, password) => {
@@ -160,10 +168,17 @@ export const AuthProvider = ({ children }) => {
   const loginWithGitHub = () => handleSocialSignIn(githubProvider);
 
   /* ================= RESET PASSWORD ================= */
-  const resetPassword = async (email) => {
-    await sendPasswordResetEmail(auth, email);
-    return true;
+  const resetPassword = async (email, provider = "local") => {
+    if (provider === "local") {
+      // 🔥 MongoDB reset
+      return await forgotPasswordLocal(email);
+    } else {
+      // 🔥 Firebase reset
+      await sendPasswordResetEmail(auth, email);
+      return true;
+    }
   };
+
 
   /* ================= FIREBASE EMAIL LOGIN ================= */
   const firebaseEmailSignUp = async (email, password) => {

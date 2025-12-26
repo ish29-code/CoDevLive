@@ -12,7 +12,7 @@ import {
     setup2FA,
     verify2FA,
 } from "../api/settingsApi";
-import { deleteAccount } from "../api/userApi";
+import { deleteAccount, forgotPasswordLocal } from "../api/userApi";
 
 import {
     Sun,
@@ -39,6 +39,8 @@ export default function Settings() {
     const [qrCode, setQrCode] = useState(null);
     const [otp, setOtp] = useState("");
     const [disableMode, setDisableMode] = useState(false);
+    const [passwordLoading, setPasswordLoading] = useState(false);
+
 
 
 
@@ -144,13 +146,28 @@ export default function Settings() {
         }
 
         try {
-            await resetPassword(user.email);
-            toast.success("Password reset link sent to your email");
+            setPasswordLoading(true); // 🔥 show loader
+
+            // ✅ LOCAL (MongoDB) user
+            if (user.provider === "local") {
+                await forgotPasswordLocal(user.email);
+                toast.success("Password reset link sent to your email");
+            }
+            // ✅ Firebase (Google / GitHub) user
+            else {
+                await resetPassword(user.email);
+                toast.success("Password reset email sent via Firebase");
+            }
         } catch (err) {
             console.error(err);
-            toast.error("Failed to send password reset email");
+            toast.error(err.message || "Failed to send password reset email");
+        } finally {
+            setPasswordLoading(false); // 🔥 hide loader
         }
     };
+
+
+    if (passwordLoading) return <Loader />;
 
 
     /* ================= UI ================= */

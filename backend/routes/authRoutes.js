@@ -1,5 +1,5 @@
 import express from "express";
-import { register, login, logout, getMe, deleteAccount } from "../controllers/authController.js";
+import { register, login, logout, getMe, deleteAccount, forgotPassword, resetPassword } from "../controllers/authController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 import { firebaseLogin } from "../controllers/firebaseAuthController.js";
 
@@ -14,6 +14,9 @@ router.post("/logout", logout);
 router.get("/me", protect, getMe);
 router.post("/firebase-login", firebaseLogin);
 router.delete("/delete", protect, deleteAccount);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
+
 
 
 
