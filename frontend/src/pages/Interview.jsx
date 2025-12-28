@@ -1,215 +1,260 @@
-import React, { useEffect, useState } from "react";
+// src/pages/Interview.jsx
+import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { socket } from "../utils/socket";
+import VideoCall from "../components/VideoCall";
+import Editor from "@monaco-editor/react";
 import {
-    Timer,
-    Code,
-    CheckCircle,
-    Brain,
-    MessageSquare,
     Play,
-    Pause,
-    RotateCcw,
+    Lightbulb,
+    Clock,
+    CheckCircle,
+    XCircle,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 
-/* ================= MODES ================= */
-const MODES = ["solo", "mock", "interviewer", "replay", "ai"];
+/* =====================================================
+   INTERVIEW PAGE (ALL FEATURES IN ONE FILE)
+   ===================================================== */
 
 export default function Interview() {
     const { theme } = useTheme();
+    const roomId = "interview-123";
 
-    /* ================= GLOBAL STATE ================= */
-    const [mode, setMode] = useState("solo");
-    const [language, setLanguage] = useState("javascript");
-    const [code, setCode] = useState("");
+    /* ================= STATES ================= */
+    const [code, setCode] = useState("// Start coding here...");
+    const [output, setOutput] = useState("");
     const [time, setTime] = useState(0);
-    const [running, setRunning] = useState(false);
+    const [running, setRunning] = useState(true);
+    const [showEval, setShowEval] = useState(false);
 
-    /* ================= INTERVIEW FLOW ================= */
-    const [flow, setFlow] = useState({
+    const [checklist, setChecklist] = useState({
         clarify: false,
         brute: false,
         optimize: false,
         final: false,
-        complexity: false,
+        analysis: false,
     });
 
-    /* ================= EVALUATION ================= */
-    const [evaluation, setEvaluation] = useState({
-        problemSolving: 0,
-        communication: 0,
-        codeQuality: 0,
-        optimization: 0,
-        notes: "",
-    });
+    const [events, setEvents] = useState([]);
+    const [hintsUsed, setHintsUsed] = useState(0);
+
+    const joinedRef = useRef(false);
+
+    /* ================= SOCKET ================= */
+    useEffect(() => {
+        if (!joinedRef.current) {
+            socket.emit("join-room", roomId);
+            joinedRef.current = true;
+        }
+
+        socket.on("code-update", (newCode) => setCode(newCode));
+
+        return () => {
+            socket.off("code-update");
+        };
+    }, []);
 
     /* ================= TIMER ================= */
     useEffect(() => {
         if (!running) return;
-        const id = setInterval(() => setTime((t) => t + 1), 1000);
-        return () => clearInterval(id);
+        const interval = setInterval(() => setTime((t) => t + 1), 1000);
+        return () => clearInterval(interval);
     }, [running]);
 
     const formatTime = () =>
-        `${Math.floor(time / 60)}:${String(time % 60).padStart(2, "0")}`;
+        `${String(Math.floor(time / 60)).padStart(2, "0")}:${String(
+            time % 60
+        ).padStart(2, "0")}`;
 
-    /* ================= HANDLERS ================= */
-    const toggleFlow = (key) =>
-        setFlow((prev) => ({ ...prev, [key]: !prev[key] }));
+    /* ================= CODE EDITOR ================= */
+    const handleCodeChange = (value) => {
+        setCode(value);
+        socket.emit("code-change", { roomId, code: value });
+    };
+
+    /* ================= RUN CODE ================= */
+    const runCode = () => {
+        try {
+            const result = eval(code);
+            setOutput(String(result ?? "Executed successfully"));
+            logEvent("Ran code");
+        } catch (err) {
+            setOutput(err.message);
+        }
+    };
+
+    /* ================= EVENTS ================= */
+    const logEvent = (label) => {
+        setEvents((e) => [
+            ...e,
+            { time: formatTime(), label },
+        ]);
+    };
 
     /* ================= UI ================= */
     return (
-        <div
-            className="
-        min-h-screen
-        bg-gradient-to-br
-        from-[var(--gradient-start)]
-        to-[var(--gradient-end)]
-        text-[var(--foreground)]
-      "
-        >
-            <div className="container-center py-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+            <div className="container-center py-4 grid grid-cols-1 lg:grid-cols-4 gap-4">
 
-                {/* ================= LEFT: PROBLEM ================= */}
-                <section className="lg:col-span-3 settings-card p-5 rounded-xl bg-[var(--card)]">
-                    <h2 className="font-semibold text-lg mb-3">Problem</h2>
+                {/* ================= LEFT: PROBLEM + CHECKLIST ================= */}
+                <div className="settings-card bg-[var(--card)] p-4 space-y-4">
+                    <h2 className="font-bold text-lg text-[var(--accent)]">Problem</h2>
                     <p className="text-sm opacity-80">
-                        Given an array, find the longest subarray with sum = K.
+                        Find the longest subarray with sum K.
                     </p>
 
-                    <div className="mt-4 text-xs opacity-70">
-                        Difficulty: <span className="font-semibold">Medium</span>
-                    </div>
-                </section>
+                    <div className="border-t pt-3 space-y-2">
+                        <h3 className="font-semibold text-sm">Interview Flow</h3>
 
-                {/* ================= CENTER: EDITOR ================= */}
-                <section className="lg:col-span-6 settings-card p-5 rounded-xl bg-[var(--card)] space-y-3">
-                    {/* Header */}
-                    <div className="flex justify-between items-center">
-                        <div className="flex gap-2">
-                            <Code size={18} />
-                            <span className="font-semibold">Code Editor</span>
-                        </div>
-
-                        <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                            className="border rounded px-2 py-1 bg-transparent"
-                        >
-                            <option value="javascript">JavaScript</option>
-                            <option value="java">Java</option>
-                            <option value="cpp">C++</option>
-                            <option value="python">Python</option>
-                        </select>
-                    </div>
-
-                    {/* Editor */}
-                    <textarea
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        readOnly={mode === "replay"}
-                        placeholder="// Start coding here..."
-                        className="
-              w-full h-[400px]
-              border rounded-lg p-3
-              bg-transparent font-mono text-sm
-            "
-                    />
-                </section>
-
-                {/* ================= RIGHT: TOOLS ================= */}
-                <section className="lg:col-span-3 space-y-6">
-
-                    {/* MODE */}
-                    <div className="settings-card p-4 rounded-xl bg-[var(--card)]">
-                        <h3 className="font-semibold mb-2">Mode</h3>
-                        <select
-                            value={mode}
-                            onChange={(e) => setMode(e.target.value)}
-                            className="w-full border rounded p-2 bg-transparent"
-                        >
-                            {MODES.map((m) => (
-                                <option key={m} value={m}>
-                                    {m.toUpperCase()}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* TIMER */}
-                    <div className="settings-card p-4 rounded-xl bg-[var(--card)]">
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                                <Timer size={18} />
-                                <span className="font-semibold">{formatTime()}</span>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button size="icon" onClick={() => setRunning(!running)}>
-                                    {running ? <Pause size={16} /> : <Play size={16} />}
-                                </Button>
-                                <Button size="icon" onClick={() => setTime(0)}>
-                                    <RotateCcw size={16} />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* INTERVIEW FLOW */}
-                    <div className="settings-card p-4 rounded-xl bg-[var(--card)]">
-                        <h3 className="font-semibold mb-3">Interview Flow</h3>
-                        {Object.keys(flow).map((k) => (
-                            <div
-                                key={k}
-                                onClick={() => toggleFlow(k)}
-                                className="flex items-center gap-2 cursor-pointer text-sm"
+                        {Object.entries(checklist).map(([key, value]) => (
+                            <label
+                                key={key}
+                                className="flex items-center gap-2 text-sm cursor-pointer"
                             >
-                                <CheckCircle
-                                    size={16}
-                                    className={flow[k] ? "text-green-500" : "opacity-30"}
+                                <input
+                                    type="checkbox"
+                                    checked={value}
+                                    onChange={() => {
+                                        setChecklist({
+                                            ...checklist,
+                                            [key]: !value,
+                                        });
+                                        logEvent(`Completed ${key}`);
+                                    }}
                                 />
-                                {k.toUpperCase()}
-                            </div>
+                                {key}
+                            </label>
                         ))}
                     </div>
+                </div>
 
-                    {/* EVALUATION */}
-                    <div className="settings-card p-4 rounded-xl bg-[var(--card)]">
-                        <h3 className="font-semibold mb-2">Evaluation</h3>
+                {/* ================= CENTER: EDITOR ================= */}
+                <div className="lg:col-span-2 settings-card bg-[var(--card)] p-3">
+                    <Editor
+                        height="60vh"
+                        language="javascript"
+                        theme={theme === "dark" ? "vs-dark" : "light"}
+                        value={code}
+                        onChange={handleCodeChange}
+                        options={{
+                            minimap: { enabled: false },
+                            fontSize: 14,
+                            smoothScrolling: true,
+                        }}
+                    />
 
-                        {["problemSolving", "communication", "codeQuality", "optimization"].map(
-                            (key) => (
-                                <div key={key} className="text-sm">
-                                    {key}:{" "}
+                    {/* RUN PANEL */}
+                    <div className="mt-3 p-3 rounded-lg bg-black text-green-400 text-sm min-h-[120px]">
+                        {output || "Output will appear here..."}
+                    </div>
+
+                    <button
+                        onClick={runCode}
+                        className="btn-outline mt-3 flex items-center gap-2"
+                    >
+                        <Play size={16} /> Run Code
+                    </button>
+                </div>
+
+                {/* ================= RIGHT: VIDEO + TOOLS ================= */}
+                <div className="space-y-4">
+
+                    {/* TIMER */}
+                    <div className="settings-card bg-[var(--card)] p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Clock size={18} />
+                            <span className="font-semibold">{formatTime()}</span>
+                        </div>
+                        <button
+                            className="btn-outline text-xs"
+                            onClick={() => setRunning(!running)}
+                        >
+                            {running ? "Pause" : "Resume"}
+                        </button>
+                    </div>
+
+                    {/* VIDEO */}
+                    <div className="settings-card bg-[var(--card)] p-3">
+                        <VideoCall roomId={roomId} />
+                    </div>
+
+                    {/* HINTS */}
+                    <div className="settings-card bg-[var(--card)] p-4 space-y-2">
+                        <h3 className="font-semibold flex items-center gap-2">
+                            <Lightbulb size={16} /> Hints
+                        </h3>
+
+                        <button
+                            className="btn-outline text-xs"
+                            onClick={() => {
+                                setHintsUsed((h) => h + 1);
+                                logEvent("Used hint");
+                            }}
+                        >
+                            Use Hint ({hintsUsed})
+                        </button>
+
+                        <p className="text-sm opacity-70">
+                            Try using prefix sum + hashmap.
+                        </p>
+                    </div>
+
+                    {/* REPLAY */}
+                    <div className="settings-card bg-[var(--card)] p-4">
+                        <h3 className="font-semibold mb-2">Replay</h3>
+                        <ul className="text-xs space-y-1 opacity-80">
+                            {events.map((e, i) => (
+                                <li key={i}>
+                                    ⏱ {e.time} — {e.label}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* END */}
+                    <button
+                        onClick={() => setShowEval(true)}
+                        className="btn-primary w-full"
+                    >
+                        End Interview
+                    </button>
+                </div>
+            </div>
+
+            {/* ================= EVALUATION MODAL ================= */}
+            {showEval && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-[var(--card)] p-6 rounded-xl w-full max-w-md">
+                        <h2 className="text-xl font-bold mb-4">Evaluation</h2>
+
+                        {["Problem Solving", "Communication", "Code Quality", "Optimization"].map(
+                            (s) => (
+                                <div key={s} className="flex justify-between mb-3">
+                                    <span>{s}</span>
                                     <input
                                         type="number"
-                                        min={0}
-                                        max={5}
-                                        value={evaluation[key]}
-                                        onChange={(e) =>
-                                            setEvaluation({
-                                                ...evaluation,
-                                                [key]: e.target.value,
-                                            })
-                                        }
-                                        className="w-12 ml-2 border rounded px-1 bg-transparent"
+                                        min="0"
+                                        max="5"
+                                        className="w-16 border p-1 rounded"
                                     />
                                 </div>
                             )
                         )}
 
                         <textarea
-                            placeholder="Notes..."
-                            value={evaluation.notes}
-                            onChange={(e) =>
-                                setEvaluation({ ...evaluation, notes: e.target.value })
-                            }
-                            className="mt-2 w-full border rounded p-2 text-sm bg-transparent"
+                            placeholder="Notes"
+                            className="w-full border p-2 rounded mt-3"
                         />
+
+                        <button
+                            onClick={() => setShowEval(false)}
+                            className="btn-primary w-full mt-4"
+                        >
+                            Save Evaluation
+                        </button>
                     </div>
-                </section>
-            </div>
+                </div>
+            )}
         </div>
     );
 }

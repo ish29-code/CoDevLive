@@ -110,6 +110,7 @@ export default function Profile() {
 
   const handleSave = async () => {
     try {
+
       const token = localStorage.getItem("token");
       if (!token) {
         toast.error("Please login again");
