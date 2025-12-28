@@ -6,37 +6,48 @@ import VideoCall from "../components/VideoCall";
 import Editor from "@monaco-editor/react";
 import {
     Play,
-    Lightbulb,
+    Pause,
     Clock,
-    CheckCircle,
-    XCircle,
+    Lightbulb,
+    ListChecks,
+    History,
+    FileText,
+    BarChart3,
+    Settings,
+    ChevronRight,
 } from "lucide-react";
 
 /* =====================================================
-   INTERVIEW PAGE (ALL FEATURES IN ONE FILE)
+   INTERVIEW PAGE — FULL FEATURE MODE
    ===================================================== */
 
 export default function Interview() {
     const { theme } = useTheme();
     const roomId = "interview-123";
 
-    /* ================= STATES ================= */
-    const [code, setCode] = useState("// Start coding here...");
+    /* ================= CORE STATES ================= */
+    const [code, setCode] = useState("// Write your solution here");
     const [output, setOutput] = useState("");
-    const [time, setTime] = useState(0);
+    const [language, setLanguage] = useState("javascript");
+
+    /* ================= TIMER ================= */
+    const [seconds, setSeconds] = useState(0);
     const [running, setRunning] = useState(true);
+
+    /* ================= FEATURES ================= */
+    const [hintsUsed, setHintsUsed] = useState(0);
+    const [notes, setNotes] = useState("");
+    const [events, setEvents] = useState([]);
     const [showEval, setShowEval] = useState(false);
 
+    /* ================= CHECKLIST ================= */
     const [checklist, setChecklist] = useState({
-        clarify: false,
-        brute: false,
-        optimize: false,
-        final: false,
-        analysis: false,
+        clarification: false,
+        bruteForce: false,
+        optimization: false,
+        finalCode: false,
+        complexity: false,
     });
-
-    const [events, setEvents] = useState([]);
-    const [hintsUsed, setHintsUsed] = useState(0);
 
     const joinedRef = useRef(false);
 
@@ -48,160 +59,208 @@ export default function Interview() {
         }
 
         socket.on("code-update", (newCode) => setCode(newCode));
-
-        return () => {
-            socket.off("code-update");
-        };
+        return () => socket.off("code-update");
     }, []);
 
     /* ================= TIMER ================= */
     useEffect(() => {
         if (!running) return;
-        const interval = setInterval(() => setTime((t) => t + 1), 1000);
+        const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
         return () => clearInterval(interval);
     }, [running]);
 
     const formatTime = () =>
-        `${String(Math.floor(time / 60)).padStart(2, "0")}:${String(
-            time % 60
+        `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(
+            seconds % 60
         ).padStart(2, "0")}`;
 
-    /* ================= CODE EDITOR ================= */
+    /* ================= EVENTS ================= */
+    const logEvent = (label) => {
+        setEvents((e) => [...e, { time: formatTime(), label }]);
+    };
+
+    /* ================= CODE ================= */
     const handleCodeChange = (value) => {
         setCode(value);
         socket.emit("code-change", { roomId, code: value });
     };
 
-    /* ================= RUN CODE ================= */
     const runCode = () => {
         try {
             const result = eval(code);
-            setOutput(String(result ?? "Executed successfully"));
-            logEvent("Ran code");
+            setOutput(String(result ?? "Executed"));
+            logEvent("Code executed");
         } catch (err) {
             setOutput(err.message);
         }
     };
 
-    /* ================= EVENTS ================= */
-    const logEvent = (label) => {
-        setEvents((e) => [
-            ...e,
-            { time: formatTime(), label },
-        ]);
-    };
-
     /* ================= UI ================= */
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-            <div className="container-center py-4 grid grid-cols-1 lg:grid-cols-4 gap-4">
+            <div className="h-screen grid grid-cols-12 gap-4 p-4">
 
-                {/* ================= LEFT: PROBLEM + CHECKLIST ================= */}
-                <div className="settings-card bg-[var(--card)] p-4 space-y-4">
-                    <h2 className="font-bold text-lg text-[var(--accent)]">Problem</h2>
-                    <p className="text-sm opacity-80">
-                        Find the longest subarray with sum K.
-                    </p>
-
-                    <div className="border-t pt-3 space-y-2">
-                        <h3 className="font-semibold text-sm">Interview Flow</h3>
-
-                        {Object.entries(checklist).map(([key, value]) => (
-                            <label
-                                key={key}
-                                className="flex items-center gap-2 text-sm cursor-pointer"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={value}
-                                    onChange={() => {
-                                        setChecklist({
-                                            ...checklist,
-                                            [key]: !value,
-                                        });
-                                        logEvent(`Completed ${key}`);
-                                    }}
-                                />
-                                {key}
-                            </label>
-                        ))}
-                    </div>
-                </div>
-
-                {/* ================= CENTER: EDITOR ================= */}
-                <div className="lg:col-span-2 settings-card bg-[var(--card)] p-3">
-                    <Editor
-                        height="60vh"
-                        language="javascript"
-                        theme={theme === "dark" ? "vs-dark" : "light"}
-                        value={code}
-                        onChange={handleCodeChange}
-                        options={{
-                            minimap: { enabled: false },
-                            fontSize: 14,
-                            smoothScrolling: true,
-                        }}
-                    />
-
-                    {/* RUN PANEL */}
-                    <div className="mt-3 p-3 rounded-lg bg-black text-green-400 text-sm min-h-[120px]">
-                        {output || "Output will appear here..."}
-                    </div>
-
-                    <button
-                        onClick={runCode}
-                        className="btn-outline mt-3 flex items-center gap-2"
-                    >
-                        <Play size={16} /> Run Code
-                    </button>
-                </div>
-
-                {/* ================= RIGHT: VIDEO + TOOLS ================= */}
-                <div className="space-y-4">
+                {/* ================= LEFT TOOLBAR ================= */}
+                <aside className="col-span-2 settings-card bg-[var(--card)] p-4 space-y-5 overflow-y-auto border">
+                    <h2 className="font-bold text-[var(--accent)] text-lg flex items-center gap-2">
+                        <Settings size={18} className="icon-muted" />
+                        Interview Tools
+                    </h2>
 
                     {/* TIMER */}
-                    <div className="settings-card bg-[var(--card)] p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Clock size={18} />
-                            <span className="font-semibold">{formatTime()}</span>
-                        </div>
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="flex items-center gap-2">
+                            <Clock size={16} className="icon-muted" />
+                            {formatTime()}
+                        </span>
                         <button
-                            className="btn-outline text-xs"
+                            className="btn-outline px-2 py-1"
                             onClick={() => setRunning(!running)}
                         >
-                            {running ? "Pause" : "Resume"}
+                            {running ? <Pause size={14} /> : <Play size={14} />}
                         </button>
                     </div>
 
-                    {/* VIDEO */}
-                    <div className="settings-card bg-[var(--card)] p-3">
-                        <VideoCall roomId={roomId} />
+                    {/* CHECKLIST */}
+                    <div>
+                        <h3 className="font-semibold flex items-center gap-2 mb-2">
+                            <ListChecks size={16} className="icon-muted" />
+                            Interview Flow
+                        </h3>
+
+                        {Object.entries(checklist).map(([k, v]) => (
+                            <label
+                                key={k}
+                                className="flex items-center gap-2 text-sm cursor-pointer opacity-80"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={v}
+                                    onChange={() => {
+                                        setChecklist({ ...checklist, [k]: !v });
+                                        logEvent(`Completed ${k}`);
+                                    }}
+                                />
+                                {k}
+                            </label>
+                        ))}
                     </div>
 
                     {/* HINTS */}
-                    <div className="settings-card bg-[var(--card)] p-4 space-y-2">
-                        <h3 className="font-semibold flex items-center gap-2">
-                            <Lightbulb size={16} /> Hints
+                    <div>
+                        <h3 className="font-semibold flex items-center gap-2 mb-1">
+                            <Lightbulb size={16} className="icon-muted" />
+                            Hints
                         </h3>
-
                         <button
                             className="btn-outline text-xs"
                             onClick={() => {
                                 setHintsUsed((h) => h + 1);
-                                logEvent("Used hint");
+                                logEvent("Hint used");
                             }}
                         >
                             Use Hint ({hintsUsed})
                         </button>
-
-                        <p className="text-sm opacity-70">
-                            Try using prefix sum + hashmap.
+                        <p className="text-xs opacity-70 mt-1">
+                            Consider prefix sum + hashmap.
                         </p>
                     </div>
 
-                    {/* REPLAY */}
-                    <div className="settings-card bg-[var(--card)] p-4">
-                        <h3 className="font-semibold mb-2">Replay</h3>
+                    {/* NOTES */}
+                    <div>
+                        <h3 className="font-semibold flex items-center gap-2 mb-1">
+                            <FileText size={16} className="icon-muted" />
+                            Notes
+                        </h3>
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="w-full border rounded p-2 text-sm bg-transparent"
+                            placeholder="Write thoughts / feedback..."
+                        />
+                    </div>
+                </aside>
+
+                {/* ================= CENTER EDITOR ================= */}
+                <main className="col-span-7 settings-card bg-[var(--card)] p-3 flex flex-col border">
+                    {/* TOP BAR */}
+                    <div className="flex items-center justify-between mb-2">
+                        <h2 className="font-bold text-lg text-[var(--accent)]">
+                            Code Editor
+                        </h2>
+
+                        <div className="flex gap-2 items-center">
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value)}
+                                className="border rounded px-2 text-sm bg-transparent"
+                            >
+                                <option value="javascript">JavaScript</option>
+                                <option value="cpp">C++</option>
+                                <option value="java">Java</option>
+                                <option value="python">Python</option>
+                            </select>
+
+                            <button onClick={runCode} className="btn-outline text-sm">
+                                <Play size={14} /> Run
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* EDITOR */}
+                    <div className="flex-1 rounded overflow-hidden border">
+                        <Editor
+                            height="100%"
+                            language={language}
+                            value={code}
+                            theme={theme === "dark" ? "vs-dark" : "light"}
+                            onChange={handleCodeChange}
+                            options={{
+                                minimap: { enabled: false },
+                                fontSize: 15,
+                                fontLigatures: true,
+                                smoothScrolling: true,
+                                cursorSmoothCaretAnimation: "on",
+                                wordWrap: "on",
+                                padding: { top: 16, bottom: 16 },
+                            }}
+                        />
+                    </div>
+
+                    {/* OUTPUT */}
+                    <div className="mt-3 p-3 rounded bg-black text-green-400 text-sm min-h-[120px]">
+                        {output || "Program output will appear here"}
+                    </div>
+                </main>
+
+                {/* ================= RIGHT PANEL ================= */}
+                <aside className="col-span-3 flex flex-col gap-4">
+
+                    {/* VIDEO */}
+                    <div className="settings-card bg-[var(--card)] p-3 border">
+                        <VideoCall roomId={roomId} />
+                    </div>
+
+                    {/* PROBLEM */}
+                    <div className="settings-card bg-[var(--card)] p-4 border">
+                        <h3 className="font-bold mb-1 flex items-center gap-2">
+                            Problem
+                            <ChevronRight size={16} className="icon-muted" />
+                        </h3>
+                        <p className="text-sm opacity-80">
+                            Find the longest subarray with sum K.
+                        </p>
+                        <p className="text-xs opacity-60 mt-1">
+                            Constraints, examples, edge cases included.
+                        </p>
+                    </div>
+
+                    {/* HISTORY */}
+                    <div className="settings-card bg-[var(--card)] p-4 flex-1 overflow-y-auto border">
+                        <h3 className="font-bold flex items-center gap-2 mb-2">
+                            <History size={16} className="icon-muted" />
+                            Timeline
+                        </h3>
                         <ul className="text-xs space-y-1 opacity-80">
                             {events.map((e, i) => (
                                 <li key={i}>
@@ -211,46 +270,48 @@ export default function Interview() {
                         </ul>
                     </div>
 
-                    {/* END */}
                     <button
                         onClick={() => setShowEval(true)}
                         className="btn-primary w-full"
                     >
                         End Interview
                     </button>
-                </div>
+                </aside>
             </div>
 
             {/* ================= EVALUATION MODAL ================= */}
             {showEval && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-                    <div className="bg-[var(--card)] p-6 rounded-xl w-full max-w-md">
-                        <h2 className="text-xl font-bold mb-4">Evaluation</h2>
+                    <div className="bg-[var(--card)] p-6 rounded-xl w-full max-w-md border">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <BarChart3 size={20} className="icon-muted" />
+                            Evaluation
+                        </h2>
 
                         {["Problem Solving", "Communication", "Code Quality", "Optimization"].map(
-                            (s) => (
-                                <div key={s} className="flex justify-between mb-3">
-                                    <span>{s}</span>
+                            (item) => (
+                                <div key={item} className="flex justify-between mb-3">
+                                    <span>{item}</span>
                                     <input
                                         type="number"
                                         min="0"
                                         max="5"
-                                        className="w-16 border p-1 rounded"
+                                        className="w-16 border rounded p-1"
                                     />
                                 </div>
                             )
                         )}
 
                         <textarea
-                            placeholder="Notes"
-                            className="w-full border p-2 rounded mt-3"
+                            placeholder="Final feedback"
+                            className="w-full border rounded p-2 mt-2"
                         />
 
                         <button
                             onClick={() => setShowEval(false)}
                             className="btn-primary w-full mt-4"
                         >
-                            Save Evaluation
+                            Save & Close
                         </button>
                     </div>
                 </div>

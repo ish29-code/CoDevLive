@@ -1,4 +1,4 @@
-// src/socket/setupSocket.js
+// backend/socket
 import { Server } from "socket.io";
 
 export const setupSocket = (server) => {

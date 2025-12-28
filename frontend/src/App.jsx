@@ -15,7 +15,7 @@ import Interview from "./pages/Interview";
 const App = () => {
   return (
     <ThemeProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className="max-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
           <Routes>
