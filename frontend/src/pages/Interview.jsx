@@ -33,16 +33,22 @@ export default function Interview() {
     const [notes, setNotes] = useState("");
     const [events, setEvents] = useState([]);
     const [showEval, setShowEval] = useState(false);
-
-    const [checklist, setChecklist] = useState({
-        clarification: false,
-        bruteForce: false,
-        optimization: false,
-        finalCode: false,
-        complexity: false,
-    });
+    const [showHint, setShowHint] = useState(false);
+    const [typing, setTyping] = useState(false);
 
     const joinedRef = useRef(false);
+
+    const checklistKeys = [
+        "clarification",
+        "bruteForce",
+        "optimization",
+        "finalCode",
+        "complexity",
+    ];
+
+    const [checklist, setChecklist] = useState(
+        checklistKeys.reduce((a, c) => ({ ...a, [c]: false }), {})
+    );
 
     /* ================= SOCKET ================= */
     useEffect(() => {
@@ -50,8 +56,7 @@ export default function Interview() {
             socket.emit("join-room", roomId);
             joinedRef.current = true;
         }
-
-        socket.on("code-update", (newCode) => setCode(newCode));
+        socket.on("code-update", setCode);
         return () => socket.off("code-update");
     }, []);
 
@@ -67,12 +72,35 @@ export default function Interview() {
             seconds % 60
         ).padStart(2, "0")}`;
 
-    const logEvent = (label) =>
-        setEvents((e) => [...e, { time: formatTime(), label }]);
+    const isCriticalTime = seconds >= 25 * 60;
 
+    const logEvent = (label) =>
+        setEvents((e) => [...e.slice(-12), { time: formatTime(), label }]);
+
+    /* ================= KEYBOARD SHORTCUTS ================= */
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey && e.key === "Enter") {
+                e.preventDefault();
+                runCode();
+            }
+            if (e.key === "Escape") {
+                setShowEval(false);
+                setShowHint(false);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    /* ================= CODE ================= */
     const handleCodeChange = (value) => {
         setCode(value);
         socket.emit("code-change", { roomId, code: value });
+
+        setTyping(true);
+        setTimeout(() => setTyping(false), 400);
     };
 
     const runCode = () => {
@@ -86,32 +114,35 @@ export default function Interview() {
     };
 
     return (
-        <div className="h-screen bg-[var(--background)] text-[var(--foreground)]">
+        <div className="h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
             <div className="h-full grid grid-cols-12 gap-3 p-3">
 
-                {/* ================= LEFT ================= */}
-                <aside className="col-span-2 bg-[var(--card)] p-3 space-y-4 text-sm overflow-hidden">
-                    <h2 className="font-semibold flex items-center gap-2 text-[var(--accent)]">
-                        <Settings size={16} /> Tools
-                    </h2>
+                {/* ========== LEFT ========== */}
+                <aside className="col-span-2 bg-[var(--card)] rounded-xl p-3 text-xs space-y-4">
+                    <div className="flex items-center gap-2 text-[var(--accent)] font-semibold">
+                        <Settings size={14} /> Tools
+                    </div>
 
                     {/* Timer */}
                     <div className="flex justify-between items-center">
-                        <span className="flex items-center gap-2">
-                            <Clock size={14} /> {formatTime()}
+                        <span
+                            className={`flex items-center gap-2 ${isCriticalTime ? "text-red-500 animate-pulse" : "opacity-80"
+                                }`}
+                        >
+                            <Clock size={12} /> {formatTime()}
                         </span>
                         <button onClick={() => setRunning(!running)}>
-                            {running ? <Pause size={14} /> : <Play size={14} />}
+                            {running ? <Pause size={12} /> : <Play size={12} />}
                         </button>
                     </div>
 
-                    {/* Checklist */}
+                    {/* Flow */}
                     <div>
-                        <h3 className="font-medium flex items-center gap-2 mb-1">
-                            <ListChecks size={14} /> Flow
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1 opacity-80">
+                            <ListChecks size={12} /> Flow
+                        </div>
                         {Object.entries(checklist).map(([k, v]) => (
-                            <label key={k} className="flex gap-2 items-center opacity-80">
+                            <label key={k} className="flex gap-2 items-center opacity-70">
                                 <input
                                     type="checkbox"
                                     checked={v}
@@ -125,49 +156,47 @@ export default function Interview() {
                         ))}
                     </div>
 
-                    {/* Hints */}
+                    {/* Hint */}
                     <div>
-                        <h3 className="font-medium flex items-center gap-2 mb-1">
-                            <Lightbulb size={14} /> Hint
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1 opacity-80">
+                            <Lightbulb size={12} /> Hint
+                        </div>
                         <button
-                            className="text-xs underline"
+                            className="underline opacity-70"
                             onClick={() => {
                                 setHintsUsed((h) => h + 1);
-                                logEvent("Hint used");
+                                setShowHint(true);
+                                logEvent("Hint opened");
                             }}
                         >
                             Use hint ({hintsUsed})
                         </button>
-                        <p className="text-xs opacity-60 mt-1">
-                            Prefix sum + hashmap
-                        </p>
                     </div>
 
                     {/* Notes */}
                     <div>
-                        <h3 className="font-medium flex items-center gap-2 mb-1">
-                            <FileText size={14} /> Notes
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1 opacity-80">
+                            <FileText size={12} /> Notes
+                        </div>
                         <textarea
+                            rows={4}
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
-                            className="w-full bg-transparent text-xs resize-none"
-                            rows={4}
+                            className="w-full bg-transparent resize-none opacity-70"
                         />
                     </div>
                 </aside>
 
-                {/* ================= CENTER ================= */}
-                <main className="col-span-7 flex flex-col bg-[var(--card)] p-2">
-                    <div className="flex justify-between items-center text-sm mb-1">
-                        <span className="font-semibold text-[var(--accent)]">Code</span>
+                {/* ========== CENTER ========== */}
+                <main className="col-span-7 bg-[var(--card)] rounded-xl p-2 flex flex-col">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                        <span className="font-semibold text-[var(--accent)]">Code Editor</span>
 
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-2">
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value)}
-                                className="bg-transparent text-xs"
+                                className="bg-[var(--background)] px-2 py-1 rounded text-xs"
                             >
                                 <option>javascript</option>
                                 <option>java</option>
@@ -175,13 +204,26 @@ export default function Interview() {
                                 <option>python</option>
                             </select>
 
-                            <button onClick={runCode} className="text-xs flex items-center gap-1">
-                                <Play size={12} /> Run
+                            <button
+                                onClick={runCode}
+                                className="px-3 py-1.5 rounded bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] transition text-xs"
+                            >
+                                Run
+                            </button>
+
+                            <button
+                                onClick={() => setShowEval(true)}
+                                className="px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition text-xs"
+                            >
+                                ⏹ End
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-hidden">
+                    <div
+                        className={`flex-1 overflow-hidden rounded-lg transition-all ${typing ? "ring-2 ring-[var(--accent)]/60" : ""
+                            }`}
+                    >
                         <Editor
                             height="100%"
                             language={language}
@@ -192,90 +234,95 @@ export default function Interview() {
                                 minimap: { enabled: false },
                                 fontSize: 14,
                                 wordWrap: "on",
-                                padding: { top: 12, bottom: 12 },
+                                padding: { top: 10, bottom: 10 },
                             }}
                         />
                     </div>
 
-                    <div className="mt-1 text-xs text-green-500 min-h-[50px]">
+                    <div className="mt-1 text-xs text-green-500 min-h-[40px]">
                         {output || "Output"}
                     </div>
                 </main>
 
-                {/* ================= RIGHT ================= */}
-                <aside className="col-span-3 flex flex-col gap-3 text-sm">
-
-                    {/* Video */}
-                    <div className="bg-[var(--card)] p-2">
+                {/* ========== RIGHT ========== */}
+                <aside className="col-span-3 flex flex-col gap-3 text-xs">
+                    <div className="bg-[var(--card)] rounded-xl p-2">
                         <VideoCall roomId={roomId} />
                     </div>
 
-                    {/* Problem */}
-                    <div className="bg-[var(--card)] p-3 space-y-1">
-                        <h3 className="font-semibold flex items-center gap-1">
-                            Problem <ChevronRight size={14} />
-                        </h3>
-
-                        <p className="text-xs opacity-80">
-                            Longest Subarray with Sum K
-                        </p>
-
-                        <div className="flex gap-2 text-xs mt-1">
+                    <div className="bg-[var(--card)] rounded-xl p-3 space-y-1">
+                        <div className="flex items-center gap-1 font-semibold">
+                            Problem <ChevronRight size={12} />
+                        </div>
+                        <p className="opacity-80">Longest Subarray with Sum K</p>
+                        <div className="flex gap-2">
                             <span className="px-2 py-[2px] rounded bg-green-500/20 text-green-500">
                                 Easy
                             </span>
                             <span className="px-2 py-[2px] rounded bg-blue-500/20 text-blue-500">
                                 Amazon
                             </span>
-                            <span className="px-2 py-[2px] rounded bg-purple-500/20 text-purple-500">
-                                Google
-                            </span>
                         </div>
                     </div>
 
-                    {/* Timeline */}
-                    <div className="bg-[var(--card)] p-3 flex-1 overflow-hidden">
-                        <h3 className="font-semibold flex items-center gap-2 mb-1">
-                            <History size={14} /> Timeline
-                        </h3>
-                        <ul className="text-xs space-y-[2px] opacity-70">
+                    <div className="bg-[var(--card)] rounded-xl p-3 flex-1">
+                        <div className="flex items-center gap-2 mb-1 font-semibold">
+                            <History size={12} /> Timeline
+                        </div>
+                        <ul className="opacity-70 space-y-[2px]">
                             {events.map((e, i) => (
                                 <li key={i}>⏱ {e.time} — {e.label}</li>
                             ))}
                         </ul>
                     </div>
-
-                    <button
-                        onClick={() => setShowEval(true)}
-                        className="btn-primary w-full text-sm py-2"
-                    >
-                        End Interview
-                    </button>
                 </aside>
             </div>
 
-            {/* ================= EVAL ================= */}
+            {/* ========== HINT DRAWER ========== */}
+            <div
+                className={`fixed top-0 right-0 h-full w-[300px] bg-[var(--card)] shadow-xl transition-transform duration-300 ${showHint ? "translate-x-0" : "translate-x-full"
+                    }`}
+            >
+                <div className="p-4 text-sm space-y-3">
+                    <div className="flex justify-between">
+                        <h3 className="font-semibold text-[var(--accent)]">Hint</h3>
+                        <button onClick={() => setShowHint(false)}>✕</button>
+                    </div>
+                    <p>
+                        Use <b>prefix sum</b> + <b>hashmap</b> to track previous sums.
+                    </p>
+                    <p className="text-xs opacity-50">Hint penalty applied</p>
+                </div>
+            </div>
+
+            {/* ========== EVALUATION MODAL ========== */}
             {showEval && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
-                    <div className="bg-[var(--card)] p-5 rounded-xl w-[360px] text-sm">
-                        <h2 className="font-semibold flex items-center gap-2 mb-3">
-                            <BarChart3 size={16} /> Evaluation
-                        </h2>
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-[var(--card)] rounded-xl p-5 w-[360px] text-sm">
+                        <div className="flex items-center gap-2 mb-4 font-semibold text-[var(--accent)]">
+                            <BarChart3 size={16} />
+                            Interview Evaluation
+                        </div>
 
                         {["Problem Solving", "Communication", "Code Quality", "Optimization"].map(
                             (item) => (
-                                <div key={item} className="flex justify-between mb-2">
-                                    <span>{item}</span>
-                                    <input type="number" min="0" max="5" className="w-12 bg-transparent" />
+                                <div key={item} className="flex justify-between items-center mb-2">
+                                    <span className="opacity-80">{item}</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="5"
+                                        className="w-12 bg-transparent border-b outline-none text-center"
+                                    />
                                 </div>
                             )
                         )}
 
                         <button
                             onClick={() => setShowEval(false)}
-                            className="btn-primary w-full mt-3"
+                            className="btn-primary w-full mt-4"
                         >
-                            Save
+                            Save Evaluation
                         </button>
                     </div>
                 </div>
