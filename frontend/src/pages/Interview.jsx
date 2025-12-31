@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import { socket } from "../utils/socket";
-import VideoCall from "../components/VideoCall";
+import VideoCall from "../components/interview/VideoCall";
 import Editor from "@monaco-editor/react";
 import {
     Play,
@@ -16,6 +16,7 @@ import {
     Settings,
     ChevronRight,
 } from "lucide-react";
+
 
 export default function Interview() {
     const { theme } = useTheme();

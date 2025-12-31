@@ -20,11 +20,16 @@ import {
 import { assets } from "@/assets/assets";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { features } from "@/data/features";
+
+function generateRoomId() {
+  return "interview-" + Math.random().toString(36).slice(2, 9);
+}
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const { roomId } = generateRoomId();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
@@ -50,6 +55,7 @@ const Navbar = () => {
       />
     );
   };
+
   return (
     <nav className="bg-[var(--background)] border-b border-[var(--border)]">
       <div className="container-center flex justify-between items-center py-4">
@@ -86,7 +92,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link to="/interview" className="nav-link">Interview</Link>
+          <Link to={`/interview-front/${roomId}`} className="nav-link">Interview</Link>
 
           {/* Profile Dropdown */}
           {user && (

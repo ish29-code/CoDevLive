@@ -1,7 +1,7 @@
 // src/components/CodeEditor.jsx
 import { useEffect } from "react";
 import Editor from "@monaco-editor/react";
-import { socket } from "../utils/socket";
+import { socket } from "../../utils/socket";
 
 export default function CodeEditor({ roomId, code, setCode }) {
     useEffect(() => {

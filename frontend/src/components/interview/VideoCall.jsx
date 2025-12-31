@@ -1,7 +1,7 @@
 // src/components/VideoCall.jsx
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, Monitor } from "lucide-react";
-import { socket } from "../utils/socket";
+import { socket } from "../../utils/socket";
 
 export default function VideoCall({ roomId }) {
     const localRef = useRef(null);

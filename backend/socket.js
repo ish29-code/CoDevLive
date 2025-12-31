@@ -6,6 +6,8 @@ export const setupSocket = (server) => {
         cors: { origin: "*" },
     });
 
+
+
     io.on("connection", (socket) => {
         console.log("🔌 User connected:", socket.id);
 
