@@ -92,7 +92,7 @@ const Navbar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link to={`/interview-front/${roomId}`} className="nav-link">Interview</Link>
+          <Link to={`/interview`} className="nav-link">Interview</Link>
 
           {/* Profile Dropdown */}
           {user && (
