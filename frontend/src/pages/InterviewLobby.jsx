@@ -19,6 +19,8 @@ export default function InterviewLobby() {
 
     /* ================= MEDIA PREVIEW ================= */
     useEffect(() => {
+        let timeoutId;
+
         navigator.mediaDevices
             .getUserMedia({ video: true, audio: true })
             .then((stream) => {
@@ -26,9 +28,18 @@ export default function InterviewLobby() {
                 videoRef.current.srcObject = stream;
                 setLoading(false);
             })
-            .catch(() => alert("Camera & Mic permission required"));
+            .catch(() => {
+                alert("Camera & Mic permission required");
+                setLoading(false); // ✅ EXIT LOADER EVEN ON FAILURE
+            });
+
+        // ✅ SAFETY EXIT (prevents infinite loader)
+        timeoutId = setTimeout(() => {
+            setLoading(false);
+        }, 3000);
 
         return () => {
+            clearTimeout(timeoutId);
             streamRef.current?.getTracks().forEach((t) => t.stop());
         };
     }, []);
@@ -48,7 +59,7 @@ export default function InterviewLobby() {
         setLoading(true);
         try {
             await axios.post("/interview/join", { roomId });
-            navigate(`/interview/room/${roomId}`);
+            navigate(`/interview/${roomId}`); // ✅ correct route
         } catch (e) {
             alert("Invalid interview link");
         } finally {

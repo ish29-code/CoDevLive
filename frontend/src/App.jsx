@@ -40,7 +40,7 @@ const App = () => {
             <Route path="/interview/lobby/:roomId" element={<InterviewLobby />} />
 
             {/* Actual Interview Room */}
-            <Route path="/interview/room/:roomId" element={<InterviewRoom />} />
+            <Route path="/interview/:roomId" element={<InterviewRoom />} />
           </Routes>
         </main>
 
