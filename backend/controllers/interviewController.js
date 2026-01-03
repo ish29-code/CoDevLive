@@ -23,7 +23,7 @@ export const createInterview = async (req, res) => {
 };
 
 export const joinInterview = async (req, res) => {
-    const { roomId } = req.body;
+    const { roomId, role } = req.body;
 
     const interview = await Interview.findOne({ roomId });
     if (!interview) return res.status(404).json({ message: "Interview not found" });
@@ -34,19 +34,18 @@ export const joinInterview = async (req, res) => {
     });
 
     if (!participant) {
-        const role =
-            interview.createdBy.toString() === req.user.id
-                ? "interviewer"
-                : "student";
-
         participant = await InterviewParticipant.create({
             interviewId: interview._id,
             userId: req.user.id,
-            role,
+            role, // ✅ USE USER-SELECTED ROLE
         });
     }
 
-    res.json({ roomId, role: participant.role, interviewId: interview._id });
+    res.json({
+        roomId,
+        role: participant.role,
+        interviewId: interview._id,
+    });
 };
 
 export const submitFeedback = async (req, res) => {
@@ -66,4 +65,5 @@ export const saveEvaluation = async (req, res) => {
     await InterviewEvaluation.create(req.body);
     res.json({ success: true });
 };
+
 

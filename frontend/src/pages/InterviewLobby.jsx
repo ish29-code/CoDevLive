@@ -11,6 +11,7 @@ import {
     Monitor,
     MonitorOff,
     AlertTriangle,
+    User,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import Loader from "../components/Loader";
@@ -31,6 +32,9 @@ export default function InterviewLobby() {
     const [loading, setLoading] = useState(true);
     const [ack, setAck] = useState(false);
 
+    // ✅ ROLE SELECTION (ADDED)
+    const [selectedRole, setSelectedRole] = useState(null); // interviewer | student
+
     /* ================= MEDIA PREVIEW ================= */
     useEffect(() => {
         let timeoutId;
@@ -46,6 +50,7 @@ export default function InterviewLobby() {
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
+                    videoRef.current.play().catch(() => { });
                 }
 
                 setLoading(false);
@@ -57,10 +62,7 @@ export default function InterviewLobby() {
 
         initMedia();
 
-        // safety exit (prevents infinite loader)
-        timeoutId = setTimeout(() => {
-            setLoading(false);
-        }, 3000);
+        timeoutId = setTimeout(() => setLoading(false), 3000);
 
         return () => {
             clearTimeout(timeoutId);
@@ -73,7 +75,6 @@ export default function InterviewLobby() {
     const toggleMic = () => {
         const tracks = streamRef.current?.getAudioTracks();
         if (!tracks?.length) return;
-
         tracks.forEach((t) => (t.enabled = !mic));
         setMic((m) => !m);
     };
@@ -81,7 +82,6 @@ export default function InterviewLobby() {
     const toggleCam = () => {
         const tracks = streamRef.current?.getVideoTracks();
         if (!tracks?.length) return;
-
         tracks.forEach((t) => (t.enabled = !cam));
         setCam((c) => !c);
     };
@@ -97,26 +97,26 @@ export default function InterviewLobby() {
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = screenStream;
+                    videoRef.current.play().catch(() => { });
                 }
 
                 setScreen(true);
 
-                // restore camera when screen sharing stops
                 screenStream.getVideoTracks()[0].onended = () => {
                     if (videoRef.current && streamRef.current) {
                         videoRef.current.srcObject = streamRef.current;
+                        videoRef.current.play().catch(() => { });
                     }
                     setScreen(false);
                 };
-            } catch {
-                // user cancelled screen share
-            }
+            } catch { }
         } else {
             screenStreamRef.current?.getTracks().forEach((t) => t.stop());
             screenStreamRef.current = null;
 
             if (videoRef.current && streamRef.current) {
                 videoRef.current.srcObject = streamRef.current;
+                videoRef.current.play().catch(() => { });
             }
 
             setScreen(false);
@@ -124,14 +124,18 @@ export default function InterviewLobby() {
     };
 
     /* ================= JOIN ================= */
-    const canJoin = mic && cam && ack;
+    const canJoin = mic && cam && ack && selectedRole;
 
     const joinInterview = async () => {
         if (!canJoin) return;
 
         setLoading(true);
         try {
-            await axios.post("/interview/join", { roomId });
+            await axios.post("/interview/join", {
+                roomId,
+                role: selectedRole, // ✅ ROLE SENT
+            });
+
             navigate(`/interview/${roomId}`);
         } catch {
             alert("Invalid interview link");
@@ -177,26 +181,17 @@ export default function InterviewLobby() {
 
                     <div className="text-xs opacity-80 space-y-1">
                         <p className="flex gap-2 items-center">
-                            {cam ? (
-                                <CheckCircle size={14} className="text-green-500" />
-                            ) : (
-                                <AlertTriangle size={14} className="text-red-500" />
-                            )}
+                            {cam ? <CheckCircle size={14} className="text-green-500" /> : <AlertTriangle size={14} className="text-red-500" />}
                             Camera {cam ? "ON" : "OFF"}
                         </p>
 
                         <p className="flex gap-2 items-center">
-                            {mic ? (
-                                <CheckCircle size={14} className="text-green-500" />
-                            ) : (
-                                <AlertTriangle size={14} className="text-red-500" />
-                            )}
+                            {mic ? <CheckCircle size={14} className="text-green-500" /> : <AlertTriangle size={14} className="text-red-500" />}
                             Microphone {mic ? "ON" : "OFF"}
                         </p>
 
                         <p className="flex gap-2 items-center">
-                            <Info size={14} />
-                            Screen share optional
+                            <Info size={14} /> Screen share optional
                         </p>
                     </div>
                 </div>
@@ -204,26 +199,63 @@ export default function InterviewLobby() {
                 {/* ================= INSTRUCTIONS ================= */}
                 <div className="card-ui p-6 col-span-2 flex flex-col gap-4">
 
+                    {/* ROLE SELECTION (ADDED) */}
+                    <div className="space-y-2">
+                        <h4 className="font-semibold flex items-center gap-2">
+                            <User size={16} /> Choose your role
+                        </h4>
+
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => setSelectedRole("interviewer")}
+                                className={`btn-outline px-4 py-2 ${selectedRole === "interviewer"
+                                        ? "ring-2 ring-[var(--accent)]"
+                                        : ""
+                                    }`}
+                            >
+                                Interviewer
+                            </button>
+
+                            <button
+                                onClick={() => setSelectedRole("student")}
+                                className={`btn-outline px-4 py-2 ${selectedRole === "student"
+                                        ? "ring-2 ring-[var(--accent)]"
+                                        : ""
+                                    }`}
+                            >
+                                Student
+                            </button>
+                        </div>
+                    </div>
+
                     <h2 className="text-xl font-semibold text-[var(--accent)]">
                         Interview Instructions
                     </h2>
 
                     <div className="text-sm opacity-80 space-y-3 leading-relaxed">
                         <p>
-                            This is a <b>live technical interview</b>. Explain your thought
-                            process clearly while coding.
+                            This is a <b>live technical interview</b>. Maintain professional
+                            communication throughout the session.
                         </p>
 
                         <p>
-                            The interviewer may ask for optimizations, edge cases, or alternate
-                            approaches.
+                            Keep your camera and microphone enabled for the entire interview.
+                        </p>
+
+                        <p>
+                            Clearly explain your approach, assumptions, and edge cases while
+                            solving problems.
+                        </p>
+
+                        <p>
+                            Screen sharing may be required during coding or explanation.
                         </p>
 
                         <p className="flex gap-2 items-start">
                             <ShieldAlert size={16} className="text-red-500 mt-1" />
                             <span>
-                                <b>Anti-cheat:</b> Tab switching, external help, or copying code
-                                is monitored and may disqualify the interview.
+                                <b>Anti-cheat policy:</b> Tab switching, external assistance,
+                                recording tools, or copying code is strictly prohibited.
                             </span>
                         </p>
                     </div>
@@ -239,15 +271,9 @@ export default function InterviewLobby() {
                             I have read and understood the interview instructions
                         </label>
 
-                        {!mic && (
+                        {!selectedRole && (
                             <p className="text-red-500 text-xs">
-                                • Please turn ON your microphone
-                            </p>
-                        )}
-
-                        {!cam && (
-                            <p className="text-red-500 text-xs">
-                                • Please turn ON your camera
+                                • Please select a role
                             </p>
                         )}
                     </div>
