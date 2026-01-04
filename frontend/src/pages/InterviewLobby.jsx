@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Mic,
+
     MicOff,
     Video,
     VideoOff,
@@ -209,8 +210,8 @@ export default function InterviewLobby() {
                             <button
                                 onClick={() => setSelectedRole("interviewer")}
                                 className={`btn-outline px-4 py-2 ${selectedRole === "interviewer"
-                                        ? "ring-2 ring-[var(--accent)]"
-                                        : ""
+                                    ? "ring-2 ring-[var(--accent)]"
+                                    : ""
                                     }`}
                             >
                                 Interviewer
@@ -219,8 +220,8 @@ export default function InterviewLobby() {
                             <button
                                 onClick={() => setSelectedRole("student")}
                                 className={`btn-outline px-4 py-2 ${selectedRole === "student"
-                                        ? "ring-2 ring-[var(--accent)]"
-                                        : ""
+                                    ? "ring-2 ring-[var(--accent)]"
+                                    : ""
                                     }`}
                             >
                                 Student
