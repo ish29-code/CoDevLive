@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Mic,
-
     MicOff,
     Video,
     VideoOff,
@@ -27,14 +26,15 @@ export default function InterviewLobby() {
     const streamRef = useRef(null);
     const screenStreamRef = useRef(null);
 
-    const [mic, setMic] = useState(true);
-    const [cam, setCam] = useState(true);
+    const [mic, setMic] = useState(false);
+    const [cam, setCam] = useState(false);
+    const [micStatus, setMicStatus] = useState(false);
+    const [camStatus, setCamStatus] = useState(false);
+
     const [screen, setScreen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [ack, setAck] = useState(false);
-
-    // ✅ ROLE SELECTION (ADDED)
-    const [selectedRole, setSelectedRole] = useState(null); // interviewer | student
+    const [selectedRole, setSelectedRole] = useState(null);
 
     /* ================= MEDIA PREVIEW ================= */
     useEffect(() => {
@@ -49,13 +49,30 @@ export default function InterviewLobby() {
 
                 streamRef.current = stream;
 
+                const audioTrack = stream.getAudioTracks()[0];
+                const videoTrack = stream.getVideoTracks()[0];
+
+                // attach stream
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    videoRef.current.play().catch(() => { });
+                    videoRef.current.onloadedmetadata = () => {
+                        videoRef.current.play().catch(() => { });
+                    };
                 }
 
+                // ✅ SYNC STATES (THIS IS THE KEY)
+                const micEnabled = !!audioTrack?.enabled;
+                const camEnabled = !!videoTrack?.enabled;
+
+                setMic(micEnabled);
+                setCam(camEnabled);
+
+                setMicStatus(micEnabled);
+                setCamStatus(camEnabled);
+
                 setLoading(false);
-            } catch {
+            } catch (err) {
+                console.error(err);
                 alert("Camera & Microphone permission required");
                 setLoading(false);
             }
@@ -72,20 +89,29 @@ export default function InterviewLobby() {
         };
     }, []);
 
-    /* ================= CONTROLS ================= */
+    /* ================= CONTROLS (FIXED) ================= */
     const toggleMic = () => {
-        const tracks = streamRef.current?.getAudioTracks();
-        if (!tracks?.length) return;
-        tracks.forEach((t) => (t.enabled = !mic));
-        setMic((m) => !m);
+        const track = streamRef.current?.getAudioTracks()[0];
+        if (!track) return;
+
+        track.enabled = !track.enabled;
+
+        setMic(track.enabled);
+        setMicStatus(track.enabled);
     };
 
     const toggleCam = () => {
-        const tracks = streamRef.current?.getVideoTracks();
-        if (!tracks?.length) return;
-        tracks.forEach((t) => (t.enabled = !cam));
-        setCam((c) => !c);
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!track) return;
+
+        track.enabled = !track.enabled;
+
+        setCam(track.enabled);
+        setCamStatus(track.enabled);
     };
+
+
+
 
     const toggleScreen = async () => {
         if (!screen) {
@@ -95,7 +121,6 @@ export default function InterviewLobby() {
                 });
 
                 screenStreamRef.current = screenStream;
-
                 if (videoRef.current) {
                     videoRef.current.srcObject = screenStream;
                     videoRef.current.play().catch(() => { });
@@ -134,9 +159,8 @@ export default function InterviewLobby() {
         try {
             await axios.post("/interview/join", {
                 roomId,
-                role: selectedRole, // ✅ ROLE SENT
+                role: selectedRole,
             });
-
             navigate(`/interview/${roomId}`);
         } catch {
             alert("Invalid interview link");
@@ -147,12 +171,11 @@ export default function InterviewLobby() {
 
     if (loading) return <Loader />;
 
-    /* ================= UI ================= */
+    /* ================= UI (UNCHANGED) ================= */
     return (
         <div className="min-h-screen page-bg flex items-center justify-center text-[var(--foreground)]">
             <div className="grid grid-cols-3 gap-6 w-[1100px]">
-
-                {/* ================= PREVIEW ================= */}
+                {/* PREVIEW */}
                 <div className="card-ui p-4 col-span-1 flex flex-col gap-4">
                     <h3 className="font-semibold text-[var(--accent)]">
                         Camera / Screen Preview
@@ -182,13 +205,21 @@ export default function InterviewLobby() {
 
                     <div className="text-xs opacity-80 space-y-1">
                         <p className="flex gap-2 items-center">
-                            {cam ? <CheckCircle size={14} className="text-green-500" /> : <AlertTriangle size={14} className="text-red-500" />}
-                            Camera {cam ? "ON" : "OFF"}
+                            {camStatus ? (
+                                <CheckCircle size={14} className="text-green-500" />
+                            ) : (
+                                <AlertTriangle size={14} className="text-red-500" />
+                            )}
+                            Camera {camStatus ? "ON" : "OFF"}
                         </p>
 
                         <p className="flex gap-2 items-center">
-                            {mic ? <CheckCircle size={14} className="text-green-500" /> : <AlertTriangle size={14} className="text-red-500" />}
-                            Microphone {mic ? "ON" : "OFF"}
+                            {micStatus ? (
+                                <CheckCircle size={14} className="text-green-500" />
+                            ) : (
+                                <AlertTriangle size={14} className="text-red-500" />
+                            )}
+                            Microphone {micStatus ? "ON" : "OFF"}
                         </p>
 
                         <p className="flex gap-2 items-center">
@@ -277,6 +308,23 @@ export default function InterviewLobby() {
                                 • Please select a role
                             </p>
                         )}
+                        {!mic && cam && (
+                            <p className="text-red-500 text-xs">
+                                • Please enable your microphone
+                            </p>
+                        )}
+                        {mic && !cam && (
+                            <p className="text-red-500 text-xs">
+                                • Please enable your camera
+                            </p>
+                        )}
+                        {!mic && !cam && (
+                            <p className="text-red-500 text-xs font-medium">
+                                • Please enable both camera and microphone
+                            </p>
+                        )}
+
+
                     </div>
 
                     <button
