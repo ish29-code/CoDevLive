@@ -15,6 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import InterviewHome from "./pages/InterviewHome";
 import InterviewLobby from "./pages/InterviewLobby";
 import InterviewRoom from "./pages/InterviewRoom";
+import DsaTracker from "./pages/DSATracker";
 
 const App = () => {
   return (
@@ -41,6 +42,7 @@ const App = () => {
 
             {/* Actual Interview Room */}
             <Route path="/interview/:roomId" element={<InterviewRoom />} />
+            <Route path="dsa-tracker" element={<DsaTracker />} />
           </Routes>
         </main>
 

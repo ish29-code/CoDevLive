@@ -146,7 +146,7 @@ export default function InterviewRoom() {
                     </div>
 
                     {/* 💡 HINTS SECTION */}
-                    <div className="pt-3 border-t border-[var(--border)]">
+                    <div className="pt-120 border-t border-[var(--border)]">
                         <div className="flex items-center gap-8 mb-2 opacity-80">
                             <Lightbulb size={12} /> Hints
                         </div>
