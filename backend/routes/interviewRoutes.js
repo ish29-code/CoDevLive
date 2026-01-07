@@ -6,20 +6,31 @@ import {
     createInterview,
     joinInterview,
     submitFeedback,
-    saveEvaluation
+    saveEvaluation,
 } from "../controllers/interviewController.js";
 
 const router = express.Router();
 
+/* CREATE INTERVIEW */
 router.post("/create", protect, createInterview);
+
+/* JOIN INTERVIEW */
 router.post("/join", protect, joinInterview);
+
+/* INTERVIEWER FEEDBACK (during interview) */
 router.post(
-    "/feedback",
+    "/feedback/interviewer",
     protect,
     interviewRoleGuard("interviewer"),
     submitFeedback
 );
-router.post("/feedback", protect, saveEvaluation);
 
+/* FINAL EVALUATION (end interview) */
+router.post(
+    "/evaluation",
+    protect,
+    interviewRoleGuard("interviewer"),
+    saveEvaluation
+);
 
 export default router;

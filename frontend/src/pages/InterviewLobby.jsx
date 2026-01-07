@@ -153,21 +153,29 @@ export default function InterviewLobby() {
     const canJoin = mic && cam && ack && selectedRole;
 
     const joinInterview = async () => {
-        if (!canJoin) return;
+        if (!canJoin || !roomId) return;
 
         setLoading(true);
         try {
-            await axios.post("/interview/join", {
+            const res = await axios.post("/interview/join", {
                 roomId,
                 role: selectedRole,
             });
+
+            // optional but good
+            sessionStorage.setItem("interviewId", res.data.interviewId);
+            sessionStorage.setItem("role", res.data.role);
             navigate(`/interview/${roomId}`);
-        } catch {
-            alert("Invalid interview link");
+        } catch (err) {
+            alert(
+                err?.response?.data?.message || "Invalid interview link"
+            );
         } finally {
             setLoading(false);
         }
     };
+
+
 
     if (loading) return <Loader />;
 

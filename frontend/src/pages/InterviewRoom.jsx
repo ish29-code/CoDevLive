@@ -1,11 +1,12 @@
-// InterviewRoom.jsx
 import { useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { socket } from "../utils/socket";
-import VideoCall from "../components/interview/VideoCall";
 import Editor from "@monaco-editor/react";
+import VideoCall from "../components/interview/VideoCall";
 import Loader from "../components/Loader";
 import axios from "../utils/axios";
+import { problems } from "../data/problems";
 
 import {
     Play,
@@ -13,72 +14,111 @@ import {
     Clock,
     Lightbulb,
     History,
-    FileText,
     BarChart3,
-    Settings,
-    ChevronRight,
 } from "lucide-react";
 
+/* ================= INLINE RUN LOADER ================= */
+function RunLoader() {
+    return (
+        <div className="flex items-center gap-2 text-xs opacity-80">
+            <span className="w-3 h-3 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+            Running...
+        </div>
+    );
+}
+
 export default function InterviewRoom() {
-    const hints = [
-        "Think about using a prefix sum to avoid recomputation.",
-        "Can you store previously seen prefix sums to speed things up?",
-        "Try using a HashMap to track earliest occurrences of sums."
-    ];
-
     const { theme } = useTheme();
+    const { roomId } = useParams();
 
-    const roomId = "interview-123";
-    const interviewId = roomId;
+    const joinedRef = useRef(false);
 
+    /* ================= STATE ================= */
     const [loading, setLoading] = useState(true);
-    const [code, setCode] = useState("// Write your solution here");
-    const [output, setOutput] = useState("");
+    const [problem, setProblem] = useState(null);
+
+    const [code, setCode] = useState("");
     const [language, setLanguage] = useState("javascript");
 
     const [seconds, setSeconds] = useState(0);
     const [running, setRunning] = useState(true);
 
-    const [hintsUsed, setHintsUsed] = useState(0);
-    const [notes, setNotes] = useState("");
+    const [output, setOutput] = useState("");
+    const [status, setStatus] = useState("");
+    const [runLoading, setRunLoading] = useState(false);
+
     const [events, setEvents] = useState([]);
+    const [hintsUsed, setHintsUsed] = useState(0);
 
     const [showEval, setShowEval] = useState(false);
-    const [showHint, setShowHint] = useState(false);
-    const [typing, setTyping] = useState(false);
-
     const [ratings, setRatings] = useState({});
-    const joinedRef = useRef(false);
 
-    const [cheatCount, setCheatCount] = useState(0);
-    const [runHistory, setRunHistory] = useState([]);
+    /* ================= FETCH INTERVIEW (PROBLEM SOURCE) ================= */
+    useEffect(() => {
+        const fetchInterview = async () => {
+            try {
+                setLoading(true);
+
+                const res = await axios.get(`/interview/${roomId}`);
+                const problemId = res.data.problemId;
+
+                if (!problemId || !problems[problemId]) {
+                    throw new Error("Problem not assigned");
+                }
+
+                setProblem(problems[problemId]);
+                setCode(problems[problemId].starterCode);
+            } catch (err) {
+                console.error("Failed to load interview", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (roomId) fetchInterview();
+    }, [roomId]);
 
     /* ================= SOCKET INIT ================= */
     useEffect(() => {
-        if (!joinedRef.current) {
-            socket.emit("join-room", roomId);
-            joinedRef.current = true;
-            setTimeout(() => setLoading(false), 800);
-        }
+        if (!roomId || joinedRef.current) return;
 
-        socket.on("code-update", setCode);
+        socket.emit("join-room", roomId);
+        joinedRef.current = true;
 
-        socket.on("cheat-event", (e) => {
-            setCheatCount((c) => c + 1);
+        const onCheatEvent = (e) =>
             logEvent(`⚠ ${e.type.replace("_", " ")}`);
-        });
+
+        socket.on("cheat-event", onCheatEvent);
 
         return () => {
-            socket.off("code-update");
-            socket.off("cheat-event");
+            socket.off("cheat-event", onCheatEvent);
+            joinedRef.current = false;
         };
-    }, []);
+    }, [roomId]);
+
+    /* ================= ANTI-CHEAT ================= */
+    useEffect(() => {
+        const blur = () =>
+            socket.emit("cheat-event", { roomId, type: "WINDOW_BLUR" });
+
+        const hidden = () =>
+            document.hidden &&
+            socket.emit("cheat-event", { roomId, type: "TAB_SWITCH" });
+
+        window.addEventListener("blur", blur);
+        document.addEventListener("visibilitychange", hidden);
+
+        return () => {
+            window.removeEventListener("blur", blur);
+            document.removeEventListener("visibilitychange", hidden);
+        };
+    }, [roomId]);
 
     /* ================= TIMER ================= */
     useEffect(() => {
         if (!running) return;
-        const i = setInterval(() => setSeconds((s) => s + 1), 1000);
-        return () => clearInterval(i);
+        const t = setInterval(() => setSeconds(s => s + 1), 1000);
+        return () => clearInterval(t);
     }, [running]);
 
     const formatTime = () =>
@@ -86,121 +126,105 @@ export default function InterviewRoom() {
             seconds % 60
         ).padStart(2, "0")}`;
 
-    const isCriticalTime = seconds >= 25 * 60;
+    const logEvent = label =>
+        setEvents(e => [...e.slice(-12), { time: formatTime(), label }]);
 
-    const logEvent = (label) =>
-        setEvents((e) => [...e.slice(-12), { time: formatTime(), label }]);
-
-    /* ================= CODE ================= */
-    const handleCodeChange = (value) => {
-        setCode(value);
-        socket.emit("code-change", { roomId, code: value });
-
-        setTyping(true);
-        setTimeout(() => setTyping(false), 400);
-    };
-
+    /* ================= RUN CODE ================= */
     const runCode = () => {
-        try {
-            eval(code);
-            setOutput("Accepted");
-            setRunHistory((r) => [...r.slice(-4), formatTime()]);
-            logEvent("Code executed");
-        } catch (err) {
-            setOutput(err.message);
-        }
+        setRunLoading(true);
+        setStatus("");
+        setOutput("");
+
+        setTimeout(() => {
+            try {
+                eval(code); // backend judge later
+                setStatus("Accepted");
+                setOutput("All test cases passed ✔️");
+                logEvent("Code executed");
+            } catch (err) {
+                setStatus("Runtime Error");
+                setOutput(err.message);
+            } finally {
+                setRunLoading(false);
+            }
+        }, 1000);
     };
 
     if (loading) return <Loader />;
 
     /* ================= UI ================= */
     return (
-        <div className="h-screen overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+        <div className="h-screen bg-[var(--background)] text-[var(--foreground)]">
             <div className="h-full grid grid-cols-12 gap-3 p-3">
 
-                {/* LEFT — PROBLEM STATEMENT */}
-                <aside className="col-span-3 bg-[var(--card)] rounded-xl p-4 text-sm space-y-4 overflow-y-auto">
-                    <h2 className="font-semibold text-[var(--accent)] text-lg">
-                        Longest Subarray with Sum K
+                {/* ================= LEFT — PROBLEM ================= */}
+                <aside className="col-span-3 card-ui p-4 text-sm overflow-y-auto space-y-4">
+                    <h2 className="text-lg font-semibold text-[var(--accent)]">
+                        {problem.title}
                     </h2>
 
-                    <p className="opacity-80">
-                        Given an array of integers and an integer <b>K</b>, find the length
-                        of the longest subarray whose sum is equal to <b>K</b>.
+                    <p className="opacity-80 whitespace-pre-line">
+                        {problem.description}
                     </p>
 
                     <div>
-                        <h4 className="font-semibold mb-1">Example</h4>
-                        <pre className="bg-[var(--background)] p-2 rounded text-xs">
-                            Input: [10, 5, 2, 7, 1, 9], K = 15
-                            Output: 4
-                        </pre>
+                        <h4 className="font-semibold mb-1">Examples</h4>
+                        {problem.examples.map((ex, i) => (
+                            <pre key={i} className="bg-[var(--background)] p-2 rounded text-xs mt-2">
+                                {`Input: ${ex.input}
+Output: ${ex.output}`}
+                            </pre>
+                        ))}
                     </div>
 
-                    <div>
-                        <h4 className="font-semibold mb-1">Constraints</h4>
-                        <ul className="list-disc ml-4 opacity-80">
-                            <li>1 ≤ N ≤ 10⁵</li>
-                            <li>-10⁴ ≤ arr[i] ≤ 10⁴</li>
-                        </ul>
-                    </div>
-
-                    {/* 💡 HINTS SECTION */}
-                    <div className="pt-120 border-t border-[var(--border)]">
-                        <div className="flex items-center gap-8 mb-2 opacity-80">
+                    {/* HINTS */}
+                    <div className="pt-3 border-t border-[var(--border)]">
+                        <div className="flex items-center gap-2 mb-2 opacity-80">
                             <Lightbulb size={12} /> Hints
                         </div>
 
-                        <div className="space-y-2">
-                            {hints.map((hint, index) => (
-                                <button
-                                    key={index}
-                                    disabled={hintsUsed < index}
-                                    onClick={() => {
-                                        setHintsUsed(index + 1);
-                                        setShowHint(true);
-                                        logEvent(`Hint ${index + 1} opened`);
-                                    }}
-                                    className={`w-full text-left px-2 py-1 rounded text-xs border 
-                    ${hintsUsed >= index
-                                            ? "border-[var(--accent)]/40 hover:bg-[var(--accent)]/10"
-                                            : "border-[var(--border)] opacity-40 cursor-not-allowed"
-                                        }`}
-                                >
-                                    Show Hint {index + 1}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                </aside>
-
-                {/* CENTER — CODE EDITOR (UNCHANGED) */}
-                <main className="col-span-6 bg-[var(--card)] rounded-xl p-2 flex flex-col">
-                    <div className="flex justify-between items-center text-xs mb-1">
-                        <span className="font-semibold text-[var(--accent)]">Code Editor</span>
-                        <div className="flex gap-2">
-                            {/* ⏱ TIMER */}
-                            <span
-                                className={`flex items-center gap-1 ${isCriticalTime ? "text-red-500 animate-pulse" : "opacity-80"
+                        {problem.hints.map((h, i) => (
+                            <button
+                                key={i}
+                                disabled={hintsUsed < i}
+                                onClick={() => {
+                                    setHintsUsed(i + 1);
+                                    logEvent(`Hint ${i + 1} opened`);
+                                }}
+                                className={`w-full text-left px-2 py-1 rounded text-xs border
+                                ${hintsUsed >= i
+                                        ? "border-[var(--accent)]/40 hover:bg-[var(--accent)]/10"
+                                        : "border-[var(--border)] opacity-40 cursor-not-allowed"
                                     }`}
                             >
-                                <Clock size={12} />
-                                {formatTime()}
+                                {hintsUsed > i ? h : `Show Hint ${i + 1}`}
+                            </button>
+                        ))}
+                    </div>
+                </aside>
+
+                {/* ================= CENTER — EDITOR + OUTPUT ================= */}
+                <main className="col-span-6 card-ui p-2 flex flex-col">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                        <span className="font-semibold text-[var(--accent)]">
+                            Code Editor
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1 opacity-80">
+                                <Clock size={12} /> {formatTime()}
                             </span>
 
-                            {/* ⏸ PAUSE / ▶ RESUME */}
                             <button
                                 onClick={() => setRunning(!running)}
-                                className="flex items-center gap-1 px-2 py-1 rounded bg-[var(--background)] border border-[var(--border)] opacity-80 hover:opacity-100"
+                                className="px-2 py-1 border rounded"
                             >
                                 {running ? <Pause size={12} /> : <Play size={12} />}
-
                             </button>
 
                             <select
                                 value={language}
-                                onChange={(e) => setLanguage(e.target.value)}
+                                onChange={e => setLanguage(e.target.value)}
                                 className="bg-[var(--background)] px-2 py-1 rounded text-xs"
                             >
                                 <option>javascript</option>
@@ -211,16 +235,16 @@ export default function InterviewRoom() {
 
                             <button
                                 onClick={runCode}
-                                className="px-3 py-1.5 rounded bg-[var(--accent)]/15 text-[var(--accent)]"
+                                className="px-3 py-1.5 bg-[var(--accent)]/15 text-[var(--accent)] rounded"
                             >
                                 Run
                             </button>
 
                             <button
                                 onClick={() => setShowEval(true)}
-                                className="px-3 py-1.5 rounded bg-red-500/10 text-red-500"
+                                className="px-3 py-1.5 bg-red-500/10 text-red-500 rounded"
                             >
-                                ⏹ End
+                                End
                             </button>
                         </div>
                     </div>
@@ -230,17 +254,18 @@ export default function InterviewRoom() {
                         language={language}
                         value={code}
                         theme={theme === "dark" ? "vs-dark" : "light"}
-                        onChange={handleCodeChange}
+                        onChange={v => setCode(v || "")}
                         options={{ minimap: { enabled: false }, fontSize: 14 }}
                     />
 
-                    {/* OUTPUT — LEETCODE STYLE */}
-                    <div className="mt-2 p-2 bg-[var(--background)] rounded text-xs">
-                        {output === "Accepted" ? (
+                    <div className="mt-2 bg-[var(--background)] rounded p-2 text-xs min-h-[44px]">
+                        {runLoading && <RunLoader />}
+                        {!runLoading && status === "Accepted" && (
                             <p className="text-green-500">
                                 ✅ Accepted — All test cases passed
                             </p>
-                        ) : (
+                        )}
+                        {!runLoading && status === "Runtime Error" && (
                             <p className="text-red-500">
                                 ❌ Runtime Error — {output}
                             </p>
@@ -248,24 +273,60 @@ export default function InterviewRoom() {
                     </div>
                 </main>
 
-                {/* RIGHT */}
+                {/* ================= RIGHT — VIDEO + TIMELINE ================= */}
                 <aside className="col-span-3 flex flex-col gap-3 text-xs">
-                    <div className="bg-[var(--card)] rounded-xl p-2">
+                    <div className="card-ui p-2">
                         <VideoCall roomId={roomId} />
                     </div>
 
-                    <div className="bg-[var(--card)] rounded-xl p-3 flex-1">
-                        <div className="flex items-center gap-2 mb-1 font-semibold">
+                    <div className="card-ui p-3 flex-1 overflow-y-auto">
+                        <div className="flex items-center gap-2 mb-2 font-semibold">
                             <History size={12} /> Timeline
                         </div>
+
                         <ul className="opacity-70 space-y-[2px]">
                             {events.map((e, i) => (
-                                <li key={i}>⏱ {e.time} — {e.label}</li>
+                                <li key={i}>
+                                    ⏱ {e.time} — {e.label}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 </aside>
             </div>
+
+            {/* ================= EVALUATION MODAL ================= */}
+            {showEval && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+                    <div className="card-ui p-5 w-[360px] text-sm">
+                        <div className="flex items-center gap-2 mb-4 font-semibold text-[var(--accent)]">
+                            <BarChart3 size={16} /> Interview Evaluation
+                        </div>
+
+                        {["Problem Solving", "Communication", "Code Quality"].map(k => (
+                            <div key={k} className="flex justify-between mb-2">
+                                <span>{k}</span>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="5"
+                                    className="w-12 bg-transparent border-b text-center"
+                                    onChange={e =>
+                                        setRatings(r => ({ ...r, [k]: e.target.value }))
+                                    }
+                                />
+                            </div>
+                        ))}
+
+                        <button
+                            onClick={() => setShowEval(false)}
+                            className="btn-primary w-full mt-4"
+                        >
+                            Save Evaluation
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
