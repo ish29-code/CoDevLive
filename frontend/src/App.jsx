@@ -16,6 +16,7 @@ import InterviewHome from "./pages/InterviewHome";
 import InterviewLobby from "./pages/InterviewLobby";
 import InterviewRoom from "./pages/InterviewRoom";
 import DsaTracker from "./pages/DSATracker";
+import PracticeRoom from "./pages/PracticeRoom";
 
 const App = () => {
   return (
@@ -43,6 +44,7 @@ const App = () => {
             {/* Actual Interview Room */}
             <Route path="/interview/:roomId" element={<InterviewRoom />} />
             <Route path="dsa-tracker" element={<DsaTracker />} />
+            <Route path="practice-room/:id" element={<PracticeRoom />} />
           </Routes>
         </main>
 
