@@ -9,5 +9,4 @@ const interviewSchema = new mongoose.Schema({
         default: "scheduled",
     },
 }, { timestamps: true });
-
 export default mongoose.model("Interview", interviewSchema);
