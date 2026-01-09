@@ -5,8 +5,9 @@ import { socket } from "../utils/socket";
 import Editor from "@monaco-editor/react";
 import VideoCall from "../components/interview/VideoCall";
 import Loader from "../components/Loader";
-import axios from "../utils/axios";
 import { problems } from "../data/problems";
+import api from "../utils/axios"; // 👈 ADD THIS IMPORT
+
 
 import {
     Play,
@@ -31,6 +32,11 @@ export default function InterviewRoom() {
     const { theme } = useTheme();
     const { roomId } = useParams();
 
+    const [myRole, setMyRole] = useState(null);
+    const isInterviewer = myRole === "interviewer";
+    const isStudent = myRole === "student";
+
+
     const joinedRef = useRef(false);
 
     /* ================= STATE ================= */
@@ -49,34 +55,55 @@ export default function InterviewRoom() {
 
     const [events, setEvents] = useState([]);
     const [hintsUsed, setHintsUsed] = useState(0);
+    const [hintsVisible, setHintsVisible] = useState(false);
+
+    const [interviewerJoined, setInterviewerJoined] = useState(false);
+    const [problemAssigned, setProblemAssigned] = useState(false);
+
+
 
     const [showEval, setShowEval] = useState(false);
-    const [ratings, setRatings] = useState({});
 
-    /* ================= FETCH INTERVIEW (PROBLEM SOURCE) ================= */
+
+
     useEffect(() => {
-        const fetchInterview = async () => {
+        const loadInterview = async () => {
             try {
-                setLoading(true);
+                const res = await api.get(`/interview/${roomId}`);
 
-                const res = await axios.get(`/interview/${roomId}`);
-                const problemId = res.data.problemId;
+                const data = res.data;
 
-                if (!problemId || !problems[problemId]) {
-                    throw new Error("Problem not assigned");
+                setMyRole(data.myRole);
+                setInterviewerJoined(data.interviewerJoined);
+                setProblemAssigned(!!data.problemId);
+
+                if (data.problemId) {
+                    const p = problems[data.problemId];
+                    setProblem(p);
+                    setCode(p.starterCode);
+                } else {
+                    setProblem(null);
                 }
 
-                setProblem(problems[problemId]);
-                setCode(problems[problemId].starterCode);
-            } catch (err) {
-                console.error("Failed to load interview", err);
-            } finally {
+
+                if (data.problemId) {
+                    const p = problems[data.problemId];
+                    setProblem(p);
+                    setCode(p.starterCode);
+                } else {
+                    setProblem(null);
+                }
+
                 setLoading(false);
+            } catch (err) {
+                console.error("Failed to load interview:", err);
             }
         };
 
-        if (roomId) fetchInterview();
+        loadInterview();
     }, [roomId]);
+
+
 
     /* ================= SOCKET INIT ================= */
     useEffect(() => {
@@ -86,18 +113,36 @@ export default function InterviewRoom() {
         joinedRef.current = true;
 
         const onCheatEvent = (e) =>
+            isInterviewer &&
             logEvent(`⚠ ${e.type.replace("_", " ")}`);
 
         socket.on("cheat-event", onCheatEvent);
+        socket.on("problem-assigned", ({ problemId }) => {
+            const p = problems[problemId];
+            setProblem(p);
+            setCode(p.starterCode);
+            setProblemAssigned(true);
+        });
+
+        socket.on("hints-visibility", (show) => {
+            setHintsVisible(show);
+        });
+
+
+        setLoading(false);
 
         return () => {
             socket.off("cheat-event", onCheatEvent);
+            socket.off("problem-assigned");
+            socket.off("hints-visibility");
             joinedRef.current = false;
         };
-    }, [roomId]);
+    }, [roomId, isInterviewer]);
 
     /* ================= ANTI-CHEAT ================= */
     useEffect(() => {
+        if (!isStudent) return;
+
         const blur = () =>
             socket.emit("cheat-event", { roomId, type: "WINDOW_BLUR" });
 
@@ -112,7 +157,7 @@ export default function InterviewRoom() {
             window.removeEventListener("blur", blur);
             document.removeEventListener("visibilitychange", hidden);
         };
-    }, [roomId]);
+    }, [roomId, isStudent]);
 
     /* ================= TIMER ================= */
     useEffect(() => {
@@ -126,8 +171,8 @@ export default function InterviewRoom() {
             seconds % 60
         ).padStart(2, "0")}`;
 
-    const logEvent = label =>
-        setEvents(e => [...e.slice(-12), { time: formatTime(), label }]);
+    const logEvent = (label) =>
+        setEvents(e => [...e.slice(-15), { time: formatTime(), label }]);
 
     /* ================= RUN CODE ================= */
     const runCode = () => {
@@ -137,73 +182,173 @@ export default function InterviewRoom() {
 
         setTimeout(() => {
             try {
-                eval(code); // backend judge later
+                eval(code);
                 setStatus("Accepted");
                 setOutput("All test cases passed ✔️");
-                logEvent("Code executed");
+                isInterviewer && logEvent("Code executed");
             } catch (err) {
                 setStatus("Runtime Error");
                 setOutput(err.message);
             } finally {
                 setRunLoading(false);
             }
-        }, 1000);
+        }, 800);
     };
 
+    /* ================= INTERVIEWER: SELECT PROBLEM ================= */
+    const selectProblem = async (p) => {
+        if (!isInterviewer) return;
+
+        try {
+            await api.post("/interview/assign-problem", {
+                roomId,
+                problemId: p.id,
+            });
+        } catch (err) {
+            console.error("Assign problem failed", err.response?.data);
+        }
+    };
+
+
     if (loading) return <Loader />;
+
+    /* ================= STUDENT WAITING ================= */
+    if (isStudent && !interviewerJoined) {
+        return (
+            <div className="h-screen flex items-center justify-center text-sm opacity-70">
+                Interviewer has not joined yet…
+            </div>
+        );
+    }
+
+    if (isStudent && interviewerJoined && !problemAssigned) {
+        return (
+            <div className="h-screen flex items-center justify-center text-sm opacity-70">
+                Interviewer joined. Waiting for problem assignment…
+            </div>
+        );
+    }
+
 
     /* ================= UI ================= */
     return (
         <div className="h-screen bg-[var(--background)] text-[var(--foreground)]">
             <div className="h-full grid grid-cols-12 gap-3 p-3">
 
-                {/* ================= LEFT — PROBLEM ================= */}
+                {/* ================= LEFT ================= */}
                 <aside className="col-span-3 card-ui p-4 text-sm overflow-y-auto space-y-4">
-                    <h2 className="text-lg font-semibold text-[var(--accent)]">
-                        {problem.title}
-                    </h2>
-
-                    <p className="opacity-80 whitespace-pre-line">
-                        {problem.description}
-                    </p>
-
-                    <div>
-                        <h4 className="font-semibold mb-1">Examples</h4>
-                        {problem.examples.map((ex, i) => (
-                            <pre key={i} className="bg-[var(--background)] p-2 rounded text-xs mt-2">
-                                {`Input: ${ex.input}
-Output: ${ex.output}`}
-                            </pre>
-                        ))}
-                    </div>
-
-                    {/* HINTS */}
-                    <div className="pt-3 border-t border-[var(--border)]">
-                        <div className="flex items-center gap-2 mb-2 opacity-80">
-                            <Lightbulb size={12} /> Hints
+                    {isStudent && interviewerJoined && !problemAssigned && (
+                        <div className="text-sm opacity-70">
+                            Problem has not been assigned yet.
                         </div>
+                    )}
 
-                        {problem.hints.map((h, i) => (
-                            <button
-                                key={i}
-                                disabled={hintsUsed < i}
-                                onClick={() => {
-                                    setHintsUsed(i + 1);
-                                    logEvent(`Hint ${i + 1} opened`);
-                                }}
-                                className={`w-full text-left px-2 py-1 rounded text-xs border
-                                ${hintsUsed >= i
-                                        ? "border-[var(--accent)]/40 hover:bg-[var(--accent)]/10"
-                                        : "border-[var(--border)] opacity-40 cursor-not-allowed"
-                                    }`}
-                            >
-                                {hintsUsed > i ? h : `Show Hint ${i + 1}`}
-                            </button>
-                        ))}
-                    </div>
+
+                    {/* INTERVIEWER PROBLEM SELECTOR */}
+                    {isInterviewer && !problem && (
+                        <div className="space-y-2">
+                            <h3 className="font-semibold text-[var(--accent)]">
+                                Select Problem
+                            </h3>
+
+                            {Object.values(problems).map(p => (
+                                <button
+                                    key={p.id}
+                                    onClick={() => selectProblem(p)}
+                                    className="w-full text-left px-3 py-2 border rounded hover:bg-[var(--accent)]/10"
+                                >
+                                    {p.title} ({p.difficulty})
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* PROBLEM VIEW */}
+                    {problem && (
+                        <>
+                            <h2 className="text-lg font-semibold text-[var(--accent)]">
+                                {problem.title}
+                            </h2>
+
+                            <p className="opacity-80 whitespace-pre-line">
+                                {problem.description}
+                            </p>
+
+                            <div>
+                                <h4 className="font-semibold mb-1">Examples</h4>
+                                {problem.examples.map((ex, i) => (
+                                    <pre key={i} className="bg-[var(--background)] p-2 rounded text-xs mt-2">
+                                        {`Input: ${ex.input}\nOutput: ${ex.output}`}
+                                    </pre>
+                                ))}
+                            </div>
+
+                            {/* ================= HINTS ================= */}
+
+                            {/* INTERVIEWER CONTROLS */}
+                            {isInterviewer && problem && (
+                                <div className="pt-3 border-t border-[var(--border)]">
+                                    <div className="flex items-center justify-between mb-2 opacity-80">
+                                        <div className="flex items-center gap-2">
+                                            <Lightbulb size={12} /> Hints
+                                        </div>
+
+                                        <button
+                                            onClick={() =>
+                                                socket.emit("toggle-hints", {
+                                                    roomId,
+                                                    show: true,
+                                                })
+                                            }
+                                            className="text-xs underline"
+                                        >
+                                            Show to student
+                                        </button>
+                                    </div>
+
+                                    {problem.hints.map((h, i) => (
+                                        <button
+                                            key={i}
+                                            disabled={hintsUsed < i}
+                                            onClick={() => {
+                                                setHintsUsed(i + 1);
+                                                logEvent(`Hint ${i + 1} used`);
+                                            }}
+                                            className={`w-full text-left px-2 py-1 rounded text-xs border
+                ${hintsUsed >= i
+                                                    ? "border-[var(--accent)]/40 hover:bg-[var(--accent)]/10"
+                                                    : "border-[var(--border)] opacity-40 cursor-not-allowed"
+                                                }`}
+                                        >
+                                            {hintsUsed > i ? h : `Show Hint ${i + 1}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* STUDENT VIEW (READ ONLY) */}
+                            {isStudent && hintsVisible && problem && (
+                                <div className="pt-3 border-t border-[var(--border)]">
+                                    <div className="flex items-center gap-2 mb-2 opacity-80">
+                                        <Lightbulb size={12} /> Hints
+                                    </div>
+
+                                    {problem.hints.slice(0, hintsUsed).map((h, i) => (
+                                        <div
+                                            key={i}
+                                            className="bg-[var(--background)] p-2 rounded text-xs mb-2"
+                                        >
+                                            {h}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
                 </aside>
 
-                {/* ================= CENTER — EDITOR + OUTPUT ================= */}
+
+                {/* ================= CENTER ================= */}
                 <main className="col-span-6 card-ui p-2 flex flex-col">
                     <div className="flex justify-between items-center text-xs mb-1">
                         <span className="font-semibold text-[var(--accent)]">
@@ -240,12 +385,14 @@ Output: ${ex.output}`}
                                 Run
                             </button>
 
-                            <button
-                                onClick={() => setShowEval(true)}
-                                className="px-3 py-1.5 bg-red-500/10 text-red-500 rounded"
-                            >
-                                End
-                            </button>
+                            {isInterviewer && (
+                                <button
+                                    onClick={() => setShowEval(true)}
+                                    className="px-3 py-1.5 bg-red-500/10 text-red-500 rounded"
+                                >
+                                    End
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -260,43 +407,40 @@ Output: ${ex.output}`}
 
                     <div className="mt-2 bg-[var(--background)] rounded p-2 text-xs min-h-[44px]">
                         {runLoading && <RunLoader />}
-                        {!runLoading && status === "Accepted" && (
-                            <p className="text-green-500">
-                                ✅ Accepted — All test cases passed
-                            </p>
-                        )}
-                        {!runLoading && status === "Runtime Error" && (
-                            <p className="text-red-500">
-                                ❌ Runtime Error — {output}
+                        {!runLoading && status && (
+                            <p className={status === "Accepted" ? "text-green-500" : "text-red-500"}>
+                                {status} — {output}
                             </p>
                         )}
                     </div>
                 </main>
 
-                {/* ================= RIGHT — VIDEO + TIMELINE ================= */}
+                {/* ================= RIGHT ================= */}
                 <aside className="col-span-3 flex flex-col gap-3 text-xs">
                     <div className="card-ui p-2">
                         <VideoCall roomId={roomId} />
                     </div>
 
-                    <div className="card-ui p-3 flex-1 overflow-y-auto">
-                        <div className="flex items-center gap-2 mb-2 font-semibold">
-                            <History size={12} /> Timeline
-                        </div>
+                    {isInterviewer && (
+                        <div className="card-ui p-3 flex-1 overflow-y-auto">
+                            <div className="flex items-center gap-2 mb-2 font-semibold">
+                                <History size={12} /> Timeline
+                            </div>
 
-                        <ul className="opacity-70 space-y-[2px]">
-                            {events.map((e, i) => (
-                                <li key={i}>
-                                    ⏱ {e.time} — {e.label}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                            <ul className="opacity-70 space-y-[2px]">
+                                {events.map((e, i) => (
+                                    <li key={i}>
+                                        ⏱ {e.time} — {e.label}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </aside>
             </div>
 
-            {/* ================= EVALUATION MODAL ================= */}
-            {showEval && (
+            {/* ================= EVALUATION ================= */}
+            {isInterviewer && showEval && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
                     <div className="card-ui p-5 w-[360px] text-sm">
                         <div className="flex items-center gap-2 mb-4 font-semibold text-[var(--accent)]">
@@ -306,15 +450,8 @@ Output: ${ex.output}`}
                         {["Problem Solving", "Communication", "Code Quality"].map(k => (
                             <div key={k} className="flex justify-between mb-2">
                                 <span>{k}</span>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="5"
-                                    className="w-12 bg-transparent border-b text-center"
-                                    onChange={e =>
-                                        setRatings(r => ({ ...r, [k]: e.target.value }))
-                                    }
-                                />
+                                <input type="number" min="0" max="5"
+                                    className="w-12 bg-transparent border-b text-center" />
                             </div>
                         ))}
 

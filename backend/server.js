@@ -26,7 +26,12 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
 /* ================= SOCKET ================= */
-setupSocket(server);
+const io = setupSocket(server);
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 
 /* ================= START ================= */
 server.listen(PORT, () => {

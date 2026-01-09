@@ -34,8 +34,18 @@ export const setupSocket = (server) => {
             socket.to(roomId).emit("ice-candidate", candidate);
         });
 
+        socket.on("assign-problem", ({ roomId, problemId }) => {
+            socket.to(roomId).emit("problem-assigned", problemId);
+        });
+
+        socket.on("toggle-hints", ({ roomId, show }) => {
+            socket.to(roomId).emit("hints-visibility", show);
+        });
+
+
         socket.on("disconnect", () => {
             console.log("❌ User disconnected:", socket.id);
         });
     });
+    return io;
 };

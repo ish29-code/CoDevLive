@@ -2,9 +2,9 @@ import axios from "axios";
 
 const instance = axios.create({
     baseURL: "http://localhost:5000/api",
+    withCredentials: true,
 });
 
-// 🔥 AUTO ATTACH TOKEN
 instance.interceptors.request.use((config) => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -14,3 +14,4 @@ instance.interceptors.request.use((config) => {
 });
 
 export default instance;
+

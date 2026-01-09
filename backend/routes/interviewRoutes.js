@@ -7,6 +7,8 @@ import {
     joinInterview,
     submitFeedback,
     saveEvaluation,
+    getInterview,
+    assignProblem,
 } from "../controllers/interviewController.js";
 
 const router = express.Router();
@@ -32,4 +34,15 @@ router.post(
     interviewRoleGuard("interviewer"),
     saveEvaluation
 );
+router.get("/:roomId", protect, getInterview);
+// routes/interviewRoutes.js
+router.post(
+    "/assign-problem",
+    protect,
+    interviewRoleGuard("interviewer"),
+    assignProblem
+);
+
+
+
 export default router;
