@@ -4,6 +4,8 @@ import InterviewFeedback from "../models/InterviewFeedback.js";
 import crypto from "crypto";
 import Interview from "../models/Interview.js";
 import InterviewEvaluation from "../models/InterviewEvaluation.js";
+import { getIO } from "../socket.js";
+
 
 export const createInterview = async (req, res) => {
     const roomId = crypto.randomUUID();
@@ -25,35 +27,60 @@ export const createInterview = async (req, res) => {
 export const joinInterview = async (req, res) => {
     const { roomId, role } = req.body;
 
-    const interview = await Interview.findOne({ roomId });
-    if (!interview)
-        return res.status(404).json({ message: "Interview not found" });
+    console.log("Incoming role from frontend:", role);
 
-    // 🔒 check existing interviewer
-    const interviewer = await InterviewParticipant.findOne({
+
+    // 1. Validate role
+    if (!["interviewer", "student"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+    }
+
+    // 2. Find interview
+    const interview = await Interview.findOne({ roomId });
+    if (!interview) {
+        return res.status(404).json({ message: "Interview not found" });
+    }
+
+    // 3. Check existing interviewer
+    const existingInterviewer = await InterviewParticipant.findOne({
         interviewId: interview._id,
         role: "interviewer",
     });
 
-    // ❌ student cannot join before interviewer
-    if (role === "student" && !interviewer) {
+    // 4. Block student if interviewer not joined
+    if (role === "student" && !existingInterviewer) {
         return res.status(403).json({
             message: "Interviewer has not joined yet",
         });
     }
 
+    // 5. Block second interviewer
+    if (role === "interviewer" && existingInterviewer) {
+        return res.status(403).json({
+            message: "Interviewer already exists",
+        });
+    }
+
+    // 6. If user already joined — return stored role
     let participant = await InterviewParticipant.findOne({
         interviewId: interview._id,
         userId: req.user.id,
     });
 
-    if (!participant) {
-        participant = await InterviewParticipant.create({
+    if (participant) {
+        return res.json({
+            roomId,
+            role: participant.role,
             interviewId: interview._id,
-            userId: req.user.id,
-            role,
         });
     }
+
+    // 7. Create new participant with correct role
+    participant = await InterviewParticipant.create({
+        interviewId: interview._id,
+        userId: req.user.id,
+        role, // ✅ role stored correctly
+    });
 
     res.json({
         roomId,
@@ -61,6 +88,7 @@ export const joinInterview = async (req, res) => {
         interviewId: interview._id,
     });
 };
+
 
 
 export const submitFeedback = async (req, res) => {
@@ -125,8 +153,9 @@ export const assignProblem = async (req, res) => {
     interview.problemId = problemId;
     await interview.save();
 
-    // ✅ NOW THIS WORKS
-    req.io.to(roomId).emit("problem-assigned", { problemId });
+    const io = getIO();
+    io.to(roomId).emit("problem-assigned", { problemId });
+
 
     res.json({ success: true });
 };

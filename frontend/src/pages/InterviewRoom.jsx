@@ -105,39 +105,45 @@ export default function InterviewRoom() {
 
 
 
+
     /* ================= SOCKET INIT ================= */
     useEffect(() => {
-        if (!roomId || joinedRef.current) return;
+        if (!roomId) return;
 
+        // join room only once
         socket.emit("join-room", roomId);
-        joinedRef.current = true;
 
-        const onCheatEvent = (e) =>
-            isInterviewer &&
-            logEvent(`⚠ ${e.type.replace("_", " ")}`);
+        // cheat events
+        const onCheatEvent = (e) => {
+            if (isInterviewer) {
+                logEvent(`⚠ ${e.type.replace("_", " ")}`);
+            }
+        };
 
-        socket.on("cheat-event", onCheatEvent);
-        socket.on("problem-assigned", ({ problemId }) => {
+        // problem assigned
+        const onProblemAssigned = ({ problemId }) => {
             const p = problems[problemId];
             setProblem(p);
             setCode(p.starterCode);
             setProblemAssigned(true);
-        });
+        };
 
-        socket.on("hints-visibility", (show) => {
+        // hint visibility
+        const onHintsVisibility = (show) => {
             setHintsVisible(show);
-        });
+        };
 
-
-        setLoading(false);
+        socket.on("cheat-event", onCheatEvent);
+        socket.on("problem-assigned", onProblemAssigned);
+        socket.on("hints-visibility", onHintsVisibility);
 
         return () => {
             socket.off("cheat-event", onCheatEvent);
-            socket.off("problem-assigned");
-            socket.off("hints-visibility");
-            joinedRef.current = false;
+            socket.off("problem-assigned", onProblemAssigned);
+            socket.off("hints-visibility", onHintsVisibility);
         };
-    }, [roomId, isInterviewer]);
+    }, [roomId]);   // ✅ Only roomId
+
 
     /* ================= ANTI-CHEAT ================= */
     useEffect(() => {

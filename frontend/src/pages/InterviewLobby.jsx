@@ -155,25 +155,28 @@ export default function InterviewLobby() {
     const joinInterview = async () => {
         if (!canJoin || !roomId) return;
 
+        // 🔥 Prevent double clicking
+        if (loading) return;
+
         setLoading(true);
+
         try {
+            console.log("Sending role:", selectedRole); // debug
             const res = await axios.post("/interview/join", {
                 roomId,
                 role: selectedRole,
             });
 
-            // optional but good
             sessionStorage.setItem("interviewId", res.data.interviewId);
             sessionStorage.setItem("role", res.data.role);
             navigate(`/interview/${roomId}`);
         } catch (err) {
-            alert(
-                err?.response?.data?.message || "Invalid interview link"
-            );
+            alert(err?.response?.data?.message || "Invalid interview link");
         } finally {
             setLoading(false);
         }
     };
+
 
 
 

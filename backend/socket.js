@@ -1,12 +1,12 @@
-// backend/socket
+// backend/socket.js
 import { Server } from "socket.io";
 
+let io; // 👈 global private variable
+
 export const setupSocket = (server) => {
-    const io = new Server(server, {
+    io = new Server(server, {
         cors: { origin: "*" },
     });
-
-
 
     io.on("connection", (socket) => {
         console.log("🔌 User connected:", socket.id);
@@ -16,12 +16,10 @@ export const setupSocket = (server) => {
             console.log(`👥 ${socket.id} joined room ${roomId}`);
         });
 
-        // 🔥 REAL-TIME CODE SYNC
         socket.on("code-change", ({ roomId, code }) => {
             socket.to(roomId).emit("code-update", code);
         });
 
-        // 🔥 WEBRTC SIGNALING
         socket.on("webrtc-offer", ({ roomId, offer }) => {
             socket.to(roomId).emit("webrtc-offer", offer);
         });
@@ -34,18 +32,22 @@ export const setupSocket = (server) => {
             socket.to(roomId).emit("ice-candidate", candidate);
         });
 
-        socket.on("assign-problem", ({ roomId, problemId }) => {
-            socket.to(roomId).emit("problem-assigned", problemId);
-        });
-
         socket.on("toggle-hints", ({ roomId, show }) => {
             socket.to(roomId).emit("hints-visibility", show);
         });
-
 
         socket.on("disconnect", () => {
             console.log("❌ User disconnected:", socket.id);
         });
     });
+
+    return io;
+};
+
+// 👇 Getter used anywhere in controllers
+export const getIO = () => {
+    if (!io) {
+        throw new Error("Socket.io not initialized!");
+    }
     return io;
 };
