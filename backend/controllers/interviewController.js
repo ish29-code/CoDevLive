@@ -6,19 +6,12 @@ import Interview from "../models/Interview.js";
 import InterviewEvaluation from "../models/InterviewEvaluation.js";
 import { getIO } from "../socket.js";
 
-
 export const createInterview = async (req, res) => {
     const roomId = crypto.randomUUID();
 
-    const interview = await Interview.create({
+    await Interview.create({
         roomId,
         createdBy: req.user.id,
-    });
-
-    await InterviewParticipant.create({
-        interviewId: interview._id,
-        userId: req.user.id,
-        role: "interviewer",
     });
 
     res.status(201).json({ roomId });
