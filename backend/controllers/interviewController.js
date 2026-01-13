@@ -27,7 +27,6 @@ export const joinInterview = async (req, res) => {
     if (!["interviewer", "student"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
     }
-
     // 2. Find interview
     const interview = await Interview.findOne({ roomId });
     if (!interview) {
