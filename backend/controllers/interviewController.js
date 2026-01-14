@@ -39,12 +39,12 @@ export const joinInterview = async (req, res) => {
         role: "interviewer",
     });
 
-    // 4. Block student if interviewer not joined
-    if (role === "student" && !existingInterviewer) {
-        return res.status(403).json({
-            message: "Interviewer has not joined yet",
-        });
-    }
+    /* // 4. Block student if interviewer not joined
+     if (role === "student" && !existingInterviewer) {
+         return res.status(403).json({
+             message: "Interviewer has not joined yet",
+         });
+     }*/
 
     // 5. Block second interviewer
     if (role === "interviewer" && existingInterviewer) {
@@ -71,13 +71,16 @@ export const joinInterview = async (req, res) => {
     participant = await InterviewParticipant.create({
         interviewId: interview._id,
         userId: req.user.id,
-        role, // ✅ role stored correctly
+        role,
+        status: role === "student" ? "pending" : "approved"
     });
+
 
     res.json({
         roomId,
         role: participant.role,
         interviewId: interview._id,
+        status: participant.status,
     });
 };
 
@@ -121,13 +124,19 @@ export const getInterview = async (req, res) => {
         role: "interviewer",
     });
 
+    const approved =
+        myParticipant?.role === "student"
+            ? myParticipant.status === "approved"
+            : true;
+
+
     res.json({
         roomId: interview.roomId,
         problemId: interview.problemId || null,
         status: interview.status,
-
         interviewerJoined: !!interviewer, // ✅ FIXED
         myRole: myParticipant?.role || null,
+        approved,
     });
 };
 
@@ -152,6 +161,41 @@ export const assignProblem = async (req, res) => {
     res.json({ success: true });
 };
 
+export const approveStudent = async (req, res) => {
+    const { roomId, studentId } = req.body;
+
+    const interview = await Interview.findOne({ roomId });
+    if (!interview) {
+        return res.status(404).json({ message: "Interview not found" });
+    }
+
+    const participant = await InterviewParticipant.findOneAndUpdate(
+        { interviewId: interview._id, userId: studentId, role: "student" },
+        { status: "approved" },
+        { new: true }
+    );
+
+    if (!participant) {
+        return res.status(404).json({ message: "Student not found" });
+    }
+
+    const io = getIO();
+    io.to(roomId).emit("student-approved", { studentId });
+
+    res.json({ success: true });
+};
+
+export const getPendingStudents = async (req, res) => {
+    const interview = await Interview.findOne({ roomId: req.params.roomId });
+
+    const pending = await InterviewParticipant.find({
+        interviewId: interview._id,
+        role: "student",
+        status: "pending"
+    }).populate("userId", "name email");
+
+    res.json(pending);
+};
 
 
 

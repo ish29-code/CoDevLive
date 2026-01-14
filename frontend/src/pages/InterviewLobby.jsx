@@ -35,6 +35,8 @@ export default function InterviewLobby() {
     const [loading, setLoading] = useState(true);
     const [ack, setAck] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
+    const [errorMsg, setErrorMsg] = useState("");
+
 
     /* ================= MEDIA PREVIEW ================= */
     useEffect(() => {
@@ -171,7 +173,7 @@ export default function InterviewLobby() {
             sessionStorage.setItem("role", res.data.role);
             navigate(`/interview/${roomId}`);
         } catch (err) {
-            alert(err?.response?.data?.message || "Invalid interview link");
+            setErrorMsg(err?.response?.data?.message || "Invalid interview link");
         } finally {
             setLoading(false);
         }
@@ -346,6 +348,11 @@ export default function InterviewLobby() {
                     >
                         Join Interview
                     </button>
+                    {errorMsg && (
+                        <p className="text-red-500 text-xs text-center">
+                            {errorMsg}
+                        </p>
+                    )}
 
                     <p className="text-xs opacity-60 text-center">
                         You cannot rejoin once the interview ends.

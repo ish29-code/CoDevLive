@@ -7,6 +7,8 @@ import VideoCall from "../components/interview/VideoCall";
 import Loader from "../components/Loader";
 import { problems } from "../data/problems";
 import api from "../utils/axios"; // 👈 ADD THIS IMPORT
+import { useNavigate } from "react-router-dom";
+
 
 
 import {
@@ -36,6 +38,7 @@ export default function InterviewRoom() {
     const isInterviewer = myRole === "interviewer";
     const isStudent = myRole === "student";
 
+    const navigate = useNavigate();
 
     const joinedRef = useRef(false);
 
@@ -59,6 +62,8 @@ export default function InterviewRoom() {
 
     const [interviewerJoined, setInterviewerJoined] = useState(false);
     const [problemAssigned, setProblemAssigned] = useState(false);
+    const [approved, setApproved] = useState(true);
+    const [pendingStudents, setPendingStudents] = useState([]);
 
 
 
@@ -76,6 +81,8 @@ export default function InterviewRoom() {
                 setMyRole(data.myRole);
                 setInterviewerJoined(data.interviewerJoined);
                 setProblemAssigned(!!data.problemId);
+                setApproved(data.approved ?? true);
+
 
                 if (data.problemId) {
                     const p = problems[data.problemId];
@@ -136,13 +143,28 @@ export default function InterviewRoom() {
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
+        socket.on("student-approved", ({ studentId }) => {
+            if (isStudent) setApproved(true);
+        });
+
+
 
         return () => {
             socket.off("cheat-event", onCheatEvent);
             socket.off("problem-assigned", onProblemAssigned);
             socket.off("hints-visibility", onHintsVisibility);
+            socket.off("student-approved");
         };
     }, [roomId]);   // ✅ Only roomId
+
+    useEffect(() => {
+        if (!isInterviewer) return;
+
+        api.get(`/interview/pending/${roomId}`)
+            .then(res => setPendingStudents(res.data))
+            .catch(() => { });
+    }, [isInterviewer, roomId]);
+
 
 
     /* ================= ANTI-CHEAT ================= */
@@ -215,25 +237,36 @@ export default function InterviewRoom() {
         }
     };
 
+    const approveStudent = async (studentId) => {
+        await api.post("/interview/approve-student", { roomId, studentId });
+
+        setPendingStudents(prev =>
+            prev.filter(s => s.userId._id !== studentId)
+        );
+    };
+
+
+
 
     if (loading) return <Loader />;
 
-    /* ================= STUDENT WAITING ================= */
+    if (isStudent && !approved) {
+        return (
+            <div className="h-screen flex items-center justify-center text-sm opacity-70">
+                ⏳ Waiting for interviewer to approve you...
+            </div>
+        );
+    }
     if (isStudent && !interviewerJoined) {
         return (
             <div className="h-screen flex items-center justify-center text-sm opacity-70">
-                Interviewer has not joined yet…
+                ⏳ Interviewer has not joined yet. Please wait...
             </div>
         );
     }
 
-    if (isStudent && interviewerJoined && !problemAssigned) {
-        return (
-            <div className="h-screen flex items-center justify-center text-sm opacity-70">
-                Interviewer joined. Waiting for problem assignment…
-            </div>
-        );
-    }
+
+
 
 
     /* ================= UI ================= */
@@ -243,14 +276,44 @@ export default function InterviewRoom() {
 
                 {/* ================= LEFT ================= */}
                 <aside className="col-span-3 card-ui p-4 text-sm overflow-y-auto space-y-4">
-                    {isStudent && interviewerJoined && !problemAssigned && (
-                        <div className="text-sm opacity-70">
-                            Problem has not been assigned yet.
+
+                    {/* INTERVIEWER — Join Requests */}
+                    {isInterviewer && pendingStudents.length > 0 && (
+                        <div className="border border-[var(--border)] rounded p-2 mb-3 text-xs">
+                            <p className="font-semibold mb-2 text-[var(--accent)]">
+                                Join Requests
+                            </p>
+
+                            {pendingStudents.map(s => (
+                                <div key={s._id} className="flex justify-between items-center mb-1">
+                                    <span>{s.userId.name || s.userId.email}</span>
+                                    <button
+                                        onClick={() => approveStudent(s.userId._id)}
+                                        className="text-green-500 underline"
+                                    >
+                                        Approve
+                                    </button>
+                                </div>
+                            ))}
                         </div>
                     )}
 
 
-                    {/* INTERVIEWER PROBLEM SELECTOR */}
+                    {/* STUDENT — interviewer not joined */}
+                    {isStudent && !interviewerJoined && (
+                        <div className="text-sm opacity-70">
+                            ⏳ Waiting for interviewer to join...
+                        </div>
+                    )}
+
+                    {/* STUDENT — interviewer joined but problem not assigned */}
+                    {isStudent && interviewerJoined && !problemAssigned && (
+                        <div className="text-sm opacity-70">
+                            ⏳ Wait a moment, interviewer has not assigned the problem yet.
+                        </div>
+                    )}
+
+                    {/* INTERVIEWER — problem selector */}
                     {isInterviewer && !problem && (
                         <div className="space-y-2">
                             <h3 className="font-semibold text-[var(--accent)]">
@@ -269,7 +332,7 @@ export default function InterviewRoom() {
                         </div>
                     )}
 
-                    {/* PROBLEM VIEW */}
+                    {/* PROBLEM VIEW — once assigned */}
                     {problem && (
                         <>
                             <h2 className="text-lg font-semibold text-[var(--accent)]">
@@ -283,16 +346,17 @@ export default function InterviewRoom() {
                             <div>
                                 <h4 className="font-semibold mb-1">Examples</h4>
                                 {problem.examples.map((ex, i) => (
-                                    <pre key={i} className="bg-[var(--background)] p-2 rounded text-xs mt-2">
+                                    <pre
+                                        key={i}
+                                        className="bg-[var(--background)] p-2 rounded text-xs mt-2"
+                                    >
                                         {`Input: ${ex.input}\nOutput: ${ex.output}`}
                                     </pre>
                                 ))}
                             </div>
 
-                            {/* ================= HINTS ================= */}
-
-                            {/* INTERVIEWER CONTROLS */}
-                            {isInterviewer && problem && (
+                            {/* HINTS — Interviewer Controls */}
+                            {isInterviewer && (
                                 <div className="pt-3 border-t border-[var(--border)]">
                                     <div className="flex items-center justify-between mb-2 opacity-80">
                                         <div className="flex items-center gap-2">
@@ -321,7 +385,7 @@ export default function InterviewRoom() {
                                                 logEvent(`Hint ${i + 1} used`);
                                             }}
                                             className={`w-full text-left px-2 py-1 rounded text-xs border
-                ${hintsUsed >= i
+                            ${hintsUsed >= i
                                                     ? "border-[var(--accent)]/40 hover:bg-[var(--accent)]/10"
                                                     : "border-[var(--border)] opacity-40 cursor-not-allowed"
                                                 }`}
@@ -332,8 +396,8 @@ export default function InterviewRoom() {
                                 </div>
                             )}
 
-                            {/* STUDENT VIEW (READ ONLY) */}
-                            {isStudent && hintsVisible && problem && (
+                            {/* STUDENT HINT VIEW */}
+                            {isStudent && hintsVisible && (
                                 <div className="pt-3 border-t border-[var(--border)]">
                                     <div className="flex items-center gap-2 mb-2 opacity-80">
                                         <Lightbulb size={12} /> Hints
@@ -352,6 +416,7 @@ export default function InterviewRoom() {
                         </>
                     )}
                 </aside>
+
 
 
                 {/* ================= CENTER ================= */}
