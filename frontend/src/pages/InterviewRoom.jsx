@@ -113,21 +113,17 @@ export default function InterviewRoom() {
 
 
 
-    /* ================= SOCKET INIT ================= */
     useEffect(() => {
         if (!roomId) return;
 
-        // join room only once
         socket.emit("join-room", roomId);
 
-        // cheat events
         const onCheatEvent = (e) => {
             if (isInterviewer) {
                 logEvent(`⚠ ${e.type.replace("_", " ")}`);
             }
         };
 
-        // problem assigned
         const onProblemAssigned = ({ problemId }) => {
             const p = problems[problemId];
             setProblem(p);
@@ -135,27 +131,32 @@ export default function InterviewRoom() {
             setProblemAssigned(true);
         };
 
-        // hint visibility
         const onHintsVisibility = (show) => {
             setHintsVisible(show);
+        };
+
+        const onStudentJoinRequest = (student) => {
+            setPendingStudents(prev => [...prev, student]);
+        };
+
+        const onStudentApproved = ({ studentId }) => {
+            if (isStudent) setApproved(true);
         };
 
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
-        socket.on("student-approved", ({ studentId }) => {
-            if (isStudent) setApproved(true);
-        });
-
-
+        socket.on("student-join-request", onStudentJoinRequest);
+        socket.on("student-approved", onStudentApproved);
 
         return () => {
             socket.off("cheat-event", onCheatEvent);
             socket.off("problem-assigned", onProblemAssigned);
             socket.off("hints-visibility", onHintsVisibility);
-            socket.off("student-approved");
+            socket.off("student-join-request", onStudentJoinRequest);
+            socket.off("student-approved", onStudentApproved);
         };
-    }, [roomId]);   // ✅ Only roomId
+    }, [roomId]);   // ✅ only roomId
 
     useEffect(() => {
         if (!isInterviewer) return;

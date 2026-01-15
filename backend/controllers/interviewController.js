@@ -20,40 +20,40 @@ export const createInterview = async (req, res) => {
 export const joinInterview = async (req, res) => {
     const { roomId, role } = req.body;
 
-    console.log("Incoming role from frontend:", role);
-
-
     // 1. Validate role
     if (!["interviewer", "student"].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
     }
+
     // 2. Find interview
     const interview = await Interview.findOne({ roomId });
     if (!interview) {
         return res.status(404).json({ message: "Interview not found" });
     }
 
-    // 3. Check existing interviewer
+    // 3. Only creator can be interviewer
+    if (
+        role === "interviewer" &&
+        interview.createdBy.toString() !== req.user.id
+    ) {
+        return res.status(403).json({
+            message: "Only interview creator can join as interviewer",
+        });
+    }
+
+    // 4. Prevent second interviewer
     const existingInterviewer = await InterviewParticipant.findOne({
         interviewId: interview._id,
         role: "interviewer",
     });
 
-    /* // 4. Block student if interviewer not joined
-     if (role === "student" && !existingInterviewer) {
-         return res.status(403).json({
-             message: "Interviewer has not joined yet",
-         });
-     }*/
-
-    // 5. Block second interviewer
     if (role === "interviewer" && existingInterviewer) {
         return res.status(403).json({
             message: "Interviewer already exists",
         });
     }
 
-    // 6. If user already joined — return stored role
+    // 5. If user already joined
     let participant = await InterviewParticipant.findOne({
         interviewId: interview._id,
         userId: req.user.id,
@@ -63,26 +63,39 @@ export const joinInterview = async (req, res) => {
         return res.json({
             roomId,
             role: participant.role,
-            interviewId: interview._id,
+            status: participant.status,
         });
     }
 
-    // 7. Create new participant with correct role
+    // 6. Create participant
     participant = await InterviewParticipant.create({
         interviewId: interview._id,
         userId: req.user.id,
         role,
-        status: role === "student" ? "pending" : "approved"
+        status: role === "student" ? "pending" : "approved",
     });
 
+    // 7. 🔥 If student → notify interviewer in real-time
+    if (role === "student") {
+        const io = getIO();
+        io.to(roomId).emit("student-join-request", {
+            _id: participant._id,
+            userId: {
+                _id: req.user.id,
+                name: req.user.name || req.user.email,
+                email: req.user.email,
+            },
+        });
+    }
 
+    // 8. Response
     res.json({
         roomId,
         role: participant.role,
-        interviewId: interview._id,
         status: participant.status,
     });
 };
+
 
 
 
