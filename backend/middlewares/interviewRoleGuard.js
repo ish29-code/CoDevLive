@@ -17,7 +17,7 @@ const interviewRoleGuard = (requiredRole) => {
 
             const participant = await InterviewParticipant.findOne({
                 interviewId: interview._id,
-                userId: req.user.id,
+                userId: req.user._id,
             });
 
             if (!participant) {

@@ -142,6 +142,15 @@ export default function InterviewRoom() {
         const onStudentApproved = ({ studentId }) => {
             if (isStudent) setApproved(true);
         };
+        const onStudentRejected = ({ studentId }) => {
+            if (isStudent) {
+                alert("Interviewer rejected your request");
+                navigate(`/interview/lobby/${roomId}`);
+            }
+        };
+
+        socket.on("student-rejected", onStudentRejected);
+
 
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
@@ -155,6 +164,8 @@ export default function InterviewRoom() {
             socket.off("hints-visibility", onHintsVisibility);
             socket.off("student-join-request", onStudentJoinRequest);
             socket.off("student-approved", onStudentApproved);
+            socket.off("student-rejected", onStudentRejected);
+
         };
     }, [roomId]);   // ✅ only roomId
 
@@ -246,6 +257,15 @@ export default function InterviewRoom() {
         );
     };
 
+    const rejectStudent = async (studentId) => {
+        await api.post("/interview/reject-student", { roomId, studentId });
+
+        setPendingStudents(prev =>
+            prev.filter(s => s.userId._id !== studentId)
+        );
+    };
+
+
 
 
 
@@ -278,28 +298,7 @@ export default function InterviewRoom() {
                 {/* ================= LEFT ================= */}
                 <aside className="col-span-3 card-ui p-4 text-sm overflow-y-auto space-y-4">
 
-                    {/* INTERVIEWER — Join Requests */}
-                    {isInterviewer && pendingStudents.length > 0 && (
-                        <div className="border border-[var(--border)] rounded p-2 mb-3 text-xs">
-                            <p className="font-semibold mb-2 text-[var(--accent)]">
-                                Join Requests
-                            </p>
 
-                            {pendingStudents.map(s => (
-                                <div key={s._id} className="flex justify-between items-center mb-1">
-                                    <span>{s.userId.name || s.userId.email}</span>
-
-                                    {/* ✅ Approve button now properly visible */}
-                                    <button
-                                        onClick={() => approveStudent(s.userId._id)}
-                                        className="px-2 py-1 text-xs bg-green-500/10 text-green-600 rounded hover:bg-green-500/20"
-                                    >
-                                        Approve
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
 
 
                     {/* STUDENT — interviewer not joined */}
@@ -417,6 +416,36 @@ export default function InterviewRoom() {
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {isInterviewer && pendingStudents.length > 0 && (
+                        <div className="border rounded p-2 text-xs">
+                            <p className="font-semibold text-[var(--accent)] mb-2">
+                                Join Requests
+                            </p>
+
+                            {pendingStudents.map(s => (
+                                <div key={s._id} className="flex justify-between items-center mb-1">
+                                    <span>{s.userId.name || s.userId.email}</span>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => approveStudent(s.userId._id)}
+                                            className="px-2 py-1 bg-green-500/15 text-green-600 rounded"
+                                        >
+                                            Approve
+                                        </button>
+
+                                        <button
+                                            onClick={() => rejectStudent(s.userId._id)}
+                                            className="px-2 py-1 bg-red-500/15 text-red-600 rounded"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </aside>
 

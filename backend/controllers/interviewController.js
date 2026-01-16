@@ -210,6 +210,26 @@ export const getPendingStudents = async (req, res) => {
     res.json(pending);
 };
 
+export const rejectStudent = async (req, res) => {
+    const { roomId, studentId } = req.body;
+
+    const interview = await Interview.findOne({ roomId });
+    if (!interview) return res.status(404).json({ message: "Interview not found" });
+
+    await InterviewParticipant.findOneAndDelete({
+        interviewId: interview._id,
+        userId: studentId,
+        role: "student",
+        status: "pending"
+    });
+
+    const io = getIO();
+    io.to(roomId).emit("student-rejected", { studentId });
+
+    res.json({ success: true });
+};
+
+
 
 
 

@@ -11,6 +11,7 @@ import {
     assignProblem,
     approveStudent,
     getPendingStudents,
+    rejectStudent,
 } from "../controllers/interviewController.js";
 
 const router = express.Router();
@@ -56,6 +57,13 @@ router.get("/pending/:roomId",
     interviewRoleGuard("interviewer"),
     getPendingStudents
 );
+router.post(
+    "/reject-student",
+    protect,
+    interviewRoleGuard("interviewer"),
+    rejectStudent
+);
+
 
 
 
