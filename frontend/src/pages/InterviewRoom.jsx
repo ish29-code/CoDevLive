@@ -288,9 +288,11 @@ export default function InterviewRoom() {
                             {pendingStudents.map(s => (
                                 <div key={s._id} className="flex justify-between items-center mb-1">
                                     <span>{s.userId.name || s.userId.email}</span>
+
+                                    {/* ✅ Approve button now properly visible */}
                                     <button
                                         onClick={() => approveStudent(s.userId._id)}
-                                        className="text-green-500 underline"
+                                        className="px-2 py-1 text-xs bg-green-500/10 text-green-600 rounded hover:bg-green-500/20"
                                     >
                                         Approve
                                     </button>
