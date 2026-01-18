@@ -34,7 +34,7 @@ export const joinInterview = async (req, res) => {
     // 3. Only creator can be interviewer
     if (
         role === "interviewer" &&
-        interview.createdBy.toString() !== req.user.id
+        interview.createdBy.toString() !== req.user._id.toString()
     ) {
         return res.status(403).json({
             message: "Only interview creator can join as interviewer",
@@ -52,6 +52,18 @@ export const joinInterview = async (req, res) => {
             message: "Interviewer already exists",
         });
     }
+
+    if (role === "student") {
+        const io = getIO();
+        io.to(roomId).emit("student-join-request", {
+            _id: participant._id,
+            userId: {
+                _id: req.user._id,
+                email: req.user.email
+            }
+        });
+    }
+
 
     // 5. If user already joined
     let participant = await InterviewParticipant.findOne({
