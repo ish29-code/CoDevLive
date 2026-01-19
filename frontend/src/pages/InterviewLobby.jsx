@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import Loader from "../components/Loader";
-import axios from "../utils/axios";
+import api from "../utils/axios";
 
 export default function InterviewLobby() {
     const { theme } = useTheme();
@@ -156,28 +156,33 @@ export default function InterviewLobby() {
 
     const joinInterview = async () => {
         if (!canJoin || !roomId) return;
-
-        // 🔥 Prevent double clicking
         if (loading) return;
 
         setLoading(true);
 
         try {
-            console.log("Sending role:", selectedRole); // debug
-            const res = await axios.post("/interview/join", {
+            const res = await api.post("/interview/join", {
                 roomId,
                 role: selectedRole,
             });
 
-            sessionStorage.setItem("interviewId", res.data.interviewId);
-            sessionStorage.setItem("role", res.data.role);
-            navigate(`/interview/${roomId}`);
+            // interviewer goes directly
+            if (selectedRole === "interviewer") {
+                navigate(`/interview/${roomId}`);
+            }
+
+            // student → stay in lobby & show waiting
+            if (selectedRole === "student") {
+                navigate(`/interview/wait/${roomId}`);
+            }
+
         } catch (err) {
             setErrorMsg(err?.response?.data?.message || "Invalid interview link");
         } finally {
             setLoading(false);
         }
     };
+
 
 
 

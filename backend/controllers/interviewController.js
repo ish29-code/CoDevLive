@@ -17,95 +17,37 @@ export const createInterview = async (req, res) => {
     res.status(201).json({ roomId });
 };
 
+// controllers/interviewController.js
 export const joinInterview = async (req, res) => {
     const { roomId, role } = req.body;
-
-    // 1. Validate role
-    if (!["interviewer", "student"].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-    }
-
-    // 2. Find interview
     const interview = await Interview.findOne({ roomId });
-    if (!interview) {
-        return res.status(404).json({ message: "Interview not found" });
+    if (!interview) return res.status(404).json({ message: "Not found" });
+
+    // Host always auto interviewer
+    if (req.user.id === interview.createdBy.toString()) {
+        await InterviewParticipant.findOneAndUpdate(
+            { interviewId: interview._id, userId: req.user.id },
+            { role: "interviewer", status: "approved" },
+            { upsert: true, new: true }
+        );
+        return res.json({ role: "interviewer", status: "approved" });
     }
 
-    // 3. Only creator can be interviewer
-    if (
-        role === "interviewer" &&
-        interview.createdBy.toString() !== req.user._id.toString()
-    ) {
-        return res.status(403).json({
-            message: "Only interview creator can join as interviewer",
-        });
-    }
-
-    // 4. Prevent second interviewer
-    const existingInterviewer = await InterviewParticipant.findOne({
-        interviewId: interview._id,
-        role: "interviewer",
-    });
-
-    if (role === "interviewer" && existingInterviewer) {
-        return res.status(403).json({
-            message: "Interviewer already exists",
-        });
-    }
-
-    if (role === "student") {
-        const io = getIO();
-        io.to(roomId).emit("student-join-request", {
-            _id: participant._id,
-            userId: {
-                _id: req.user._id,
-                email: req.user.email
-            }
-        });
-    }
-
-
-    // 5. If user already joined
-    let participant = await InterviewParticipant.findOne({
-        interviewId: interview._id,
-        userId: req.user.id,
-    });
-
-    if (participant) {
-        return res.json({
-            roomId,
-            role: participant.role,
-            status: participant.status,
-        });
-    }
-
-    // 6. Create participant
-    participant = await InterviewParticipant.create({
+    // Everyone else pending
+    const participant = await InterviewParticipant.create({
         interviewId: interview._id,
         userId: req.user.id,
         role,
-        status: role === "student" ? "pending" : "approved",
+        status: "pending",
     });
 
-    // 7. 🔥 If student → notify interviewer in real-time
-    if (role === "student") {
-        const io = getIO();
-        io.to(roomId).emit("student-join-request", {
-            _id: participant._id,
-            userId: {
-                _id: req.user.id,
-                name: req.user.name || req.user.email,
-                email: req.user.email,
-            },
-        });
-    }
-
-    // 8. Response
-    res.json({
-        roomId,
-        role: participant.role,
-        status: participant.status,
+    req.io.to(roomId).emit("join-request", {
+        userId: req.user.id,
+        name: req.user.name,
+        requestedRole: role,
     });
+
+    res.json({ role, status: "pending" });
 };
 
 
@@ -137,6 +79,9 @@ export const getInterview = async (req, res) => {
         return res.status(404).json({ message: "Interview not found" });
     }
 
+    const isCreator = interview.createdBy.toString() === req.user.id;
+
+
     // 👤 current user participant
     const myParticipant = await InterviewParticipant.findOne({
         interviewId: interview._id,
@@ -149,20 +94,27 @@ export const getInterview = async (req, res) => {
         role: "interviewer",
     });
 
-    const approved =
-        myParticipant?.role === "student"
-            ? myParticipant.status === "approved"
-            : true;
+    let approved = false;
+
+    if (myParticipant) {
+        if (myParticipant.role === "student") {
+            approved = myParticipant.status === "approved";
+        } else {
+            approved = true; // interviewer always approved
+        }
+    }
+
 
 
     res.json({
         roomId: interview.roomId,
         problemId: interview.problemId || null,
-        status: interview.status,
-        interviewerJoined: !!interviewer, // ✅ FIXED
+        interviewerJoined: !!interviewer,
         myRole: myParticipant?.role || null,
         approved,
+        isCreator,
     });
+
 };
 
 
@@ -186,29 +138,29 @@ export const assignProblem = async (req, res) => {
     res.json({ success: true });
 };
 
-export const approveStudent = async (req, res) => {
-    const { roomId, studentId } = req.body;
-
+export const approveParticipant = async (req, res) => {
+    const { roomId, userId } = req.body;
     const interview = await Interview.findOne({ roomId });
-    if (!interview) {
-        return res.status(404).json({ message: "Interview not found" });
-    }
+
+    if (interview.createdBy.toString() !== req.user.id)
+        return res.status(403).json({ message: "Only host can approve" });
 
     const participant = await InterviewParticipant.findOneAndUpdate(
-        { interviewId: interview._id, userId: studentId, role: "student" },
+        { interviewId: interview._id, userId },
         { status: "approved" },
         { new: true }
     );
 
-    if (!participant) {
-        return res.status(404).json({ message: "Student not found" });
-    }
-
-    const io = getIO();
-    io.to(roomId).emit("student-approved", { studentId });
+    req.io.to(roomId).emit("participant-approved", {
+        userId,
+        role: participant.role,
+    });
 
     res.json({ success: true });
 };
+
+
+
 
 export const getPendingStudents = async (req, res) => {
     const interview = await Interview.findOne({ roomId: req.params.roomId });
@@ -241,6 +193,22 @@ export const rejectStudent = async (req, res) => {
     res.json({ success: true });
 };
 
+export const addInterviewer = async (req, res) => {
+    const { roomId, newInterviewerId } = req.body;
+
+    const interview = await Interview.findOne({ roomId });
+
+    if (interview.createdBy.toString() !== req.user.id) {
+        return res.status(403).json({ message: "Only host can add interviewers" });
+    }
+
+    if (!interview.interviewers.includes(newInterviewerId)) {
+        interview.interviewers.push(newInterviewerId);
+        await interview.save();
+    }
+
+    res.json({ success: true });
+};
 
 
 

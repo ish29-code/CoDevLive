@@ -15,7 +15,6 @@ export const setupSocket = (server) => {
             socket.join(roomId);
             console.log(`👥 ${socket.id} joined room ${roomId}`);
         });
-
         // Code sync
         socket.on("code-change", ({ roomId, code }) => {
             socket.to(roomId).emit("code-update", code);

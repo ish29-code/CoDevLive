@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 import Loader from "../components/Loader";
-import axios from "../utils/axios";
+import api from "../utils/axios";
 import { Video, Link2, ArrowRight } from "lucide-react";
 
 export default function InterviewHome() {
@@ -16,7 +16,7 @@ export default function InterviewHome() {
     const createInterview = async () => {
         setLoading(true);
         try {
-            const res = await axios.post("/interview/create");
+            const res = await api.post("/interview/create");
             navigate(`/interview/lobby/${res.data.roomId}`);
         } catch (err) {
             console.error(err);

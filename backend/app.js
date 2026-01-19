@@ -7,16 +7,19 @@ import profileRoutes from "./routes/profileRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import interviewRoutes from "./routes/interviewRoutes.js";
 
+import "./config/firebaseAdmin.js";
+
+
+
 const app = express();
 
 /* ================= GLOBAL MIDDLEWARE ================= */
 
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+  allowedHeaders: ["Authorization", "x-auth-type", "Content-Type"],
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -8,6 +8,8 @@ import Loader from "../components/Loader";
 import { problems } from "../data/problems";
 import api from "../utils/axios"; // 👈 ADD THIS IMPORT
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
 
 
 
@@ -32,10 +34,13 @@ function RunLoader() {
 }
 
 export default function InterviewRoom() {
+    const { user } = useAuth();
     const { theme } = useTheme();
     const { roomId } = useParams();
 
     const [myRole, setMyRole] = useState(null);
+    const [isCreator, setIsCreator] = useState(false);
+
     const isInterviewer = myRole === "interviewer";
     const isStudent = myRole === "student";
 
@@ -63,7 +68,7 @@ export default function InterviewRoom() {
 
     const [interviewerJoined, setInterviewerJoined] = useState(false);
     const [problemAssigned, setProblemAssigned] = useState(false);
-    const [approved, setApproved] = useState(true);
+    const [approved, setApproved] = useState(false);
     const [pendingStudents, setPendingStudents] = useState([]);
 
 
@@ -80,9 +85,10 @@ export default function InterviewRoom() {
                 const data = res.data;
 
                 setMyRole(data.myRole);
+                setIsCreator(data.isCreator);
                 setInterviewerJoined(data.interviewerJoined);
                 setProblemAssigned(!!data.problemId);
-                setApproved(data.approved ?? true);
+                setApproved(Boolean(data.approved));
 
 
                 if (data.problemId) {
@@ -114,9 +120,14 @@ export default function InterviewRoom() {
 
 
 
+
+
+
+
     useEffect(() => {
         if (!roomId) return;
 
+        // Join websocket room for realtime communication
         socket.emit("join-room", roomId);
 
         const onCheatEvent = (e) => {
@@ -141,18 +152,29 @@ export default function InterviewRoom() {
         };
 
         const onStudentApproved = ({ studentId }) => {
-            if (isStudent) setApproved(true);
+            if (studentId === user._id) {
+                setApproved(true);
+            }
         };
+
+
+
+
         const onStudentRejected = ({ studentId }) => {
-            if (isStudent) {
+            if (isStudent && studentId === user._id) {
                 alert("Interviewer rejected your request");
                 navigate(`/interview/lobby/${roomId}`);
             }
         };
 
+        const onInterviewerApproved = ({ userId }) => {
+            if (userId === user._id) {
+                window.location.reload();
+            }
+        };
+
+        socket.on("interviewer-approved", onInterviewerApproved);
         socket.on("student-rejected", onStudentRejected);
-
-
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
@@ -166,6 +188,7 @@ export default function InterviewRoom() {
             socket.off("student-join-request", onStudentJoinRequest);
             socket.off("student-approved", onStudentApproved);
             socket.off("student-rejected", onStudentRejected);
+            socket.off("interviewer-approved", onInterviewerApproved);
 
         };
     }, [roomId]);   // ✅ only roomId

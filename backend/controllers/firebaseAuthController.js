@@ -23,11 +23,13 @@ export const firebaseLogin = async (req, res) => {
     // Accept token from Authorization header (we set it in AuthContext)
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
-    if (user.provider !== "local") {
+    if (user && user.provider === "local") {
       return res.status(400).json({
-        message: "This account uses Google/GitHub login",
+        success: false,
+        message: "This account uses Email/Password login",
       });
     }
+
 
     if (!token) return res.status(401).json({ success: false, message: "No token" });
 

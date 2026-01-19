@@ -1,3 +1,4 @@
+// backend/config/firebaseAdmin.js
 import admin from "firebase-admin";
 import { createRequire } from "module";
 
@@ -11,5 +12,3 @@ if (!admin.apps.length) {
 }
 
 export default admin;
-
-
