@@ -36,6 +36,19 @@ export default function InterviewLobby() {
     const [ack, setAck] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
+    const [isHost, setIsHost] = useState(false);
+
+
+    useEffect(() => {
+        if (!roomId) return;
+
+        api.get(`/interview/${roomId}`).then(res => {
+            if (res.data.isCreator) {
+                setIsHost(true);
+                setSelectedRole("interviewer"); // force host role
+            }
+        });
+    }, [roomId]);
 
 
     /* ================= MEDIA PREVIEW ================= */
@@ -152,36 +165,38 @@ export default function InterviewLobby() {
     };
 
     /* ================= JOIN ================= */
-    const canJoin = mic && cam && ack && selectedRole;
+    const canJoin = mic && cam && ack && !!selectedRole;
 
     const joinInterview = async () => {
         if (!canJoin || !roomId) return;
-        if (loading) return;
 
         setLoading(true);
 
         try {
             const res = await api.post("/interview/join", {
                 roomId,
-                role: selectedRole,
+                role: selectedRole
             });
 
-            // interviewer goes directly
-            if (selectedRole === "interviewer") {
+            console.log("JOIN RESPONSE:", res.data);
+
+            // 🔥 HOST → Go directly to interview room
+            if (res.data.direct === true) {
                 navigate(`/interview/${roomId}`);
+                return;
             }
 
-            // student → stay in lobby & show waiting
-            if (selectedRole === "student") {
-                navigate(`/interview/wait/${roomId}`);
-            }
+            // 👤 Everyone else → Wait for approval
+            navigate(`/interview/wait/${roomId}`);
+            return;
 
         } catch (err) {
             setErrorMsg(err?.response?.data?.message || "Invalid interview link");
-        } finally {
             setLoading(false);
         }
     };
+
+
 
 
 
@@ -258,23 +273,27 @@ export default function InterviewLobby() {
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setSelectedRole("interviewer")}
+                                disabled={isHost}
                                 className={`btn-outline px-4 py-2 ${selectedRole === "interviewer"
                                     ? "ring-2 ring-[var(--accent)]"
                                     : ""
-                                    }`}
+                                    } ${isHost ? "opacity-70 cursor-not-allowed" : ""}`}
                             >
                                 Interviewer
                             </button>
 
                             <button
                                 onClick={() => setSelectedRole("student")}
+                                disabled={isHost}
                                 className={`btn-outline px-4 py-2 ${selectedRole === "student"
                                     ? "ring-2 ring-[var(--accent)]"
                                     : ""
-                                    }`}
+                                    } ${isHost ? "opacity-70 cursor-not-allowed" : ""}`}
                             >
                                 Student
                             </button>
+
+
                         </div>
                     </div>
 

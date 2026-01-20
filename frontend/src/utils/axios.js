@@ -6,7 +6,7 @@ const api = axios.create({
     baseURL: "http://localhost:5000/api",
 });
 
-api.interceptors.request.use(async (config) => {
+/*api.interceptors.request.use(async (config) => {
     const fbUser = auth.currentUser;
 
     // Google login
@@ -25,6 +25,26 @@ api.interceptors.request.use(async (config) => {
     }
 
     return config;
+});*/
+
+api.interceptors.request.use(async (config) => {
+    const fbUser = auth.currentUser;
+
+    if (fbUser) {
+        const fbToken = await fbUser.getIdToken(true);
+        config.headers.Authorization = `Bearer ${fbToken}`;
+        config.headers["x-auth-type"] = "firebase";   // ✅ always set
+        return config;
+    }
+
+    const dbToken = localStorage.getItem("token");
+    if (dbToken) {
+        config.headers.Authorization = `Bearer ${dbToken}`;
+        config.headers["x-auth-type"] = "jwt";        // ✅ always set
+    }
+
+    return config;
 });
+
 
 export default api;

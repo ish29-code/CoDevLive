@@ -99,15 +99,6 @@ export default function InterviewRoom() {
                     setProblem(null);
                 }
 
-
-                if (data.problemId) {
-                    const p = problems[data.problemId];
-                    setProblem(p);
-                    setCode(p.starterCode);
-                } else {
-                    setProblem(null);
-                }
-
                 setLoading(false);
             } catch (err) {
                 console.error("Failed to load interview:", err);
@@ -127,15 +118,17 @@ export default function InterviewRoom() {
     useEffect(() => {
         if (!roomId) return;
 
-        // Join websocket room for realtime communication
+        // Join websocket room
         socket.emit("join-room", roomId);
 
+        // ---- CHEAT EVENTS ----
         const onCheatEvent = (e) => {
             if (isInterviewer) {
                 logEvent(`⚠ ${e.type.replace("_", " ")}`);
             }
         };
 
+        // ---- PROBLEM ASSIGNED ----
         const onProblemAssigned = ({ problemId }) => {
             const p = problems[problemId];
             setProblem(p);
@@ -143,55 +136,53 @@ export default function InterviewRoom() {
             setProblemAssigned(true);
         };
 
+        // ---- HINT VISIBILITY ----
         const onHintsVisibility = (show) => {
             setHintsVisible(show);
         };
 
-        const onStudentJoinRequest = (student) => {
-            setPendingStudents(prev => [...prev, student]);
+        // ---- HOST RECEIVES JOIN REQUESTS ----
+        const onJoinRequest = (participant) => {
+            setPendingStudents(prev => [...prev, participant]);
         };
 
-        const onStudentApproved = ({ studentId }) => {
-            if (studentId === user._id) {
-                setApproved(true);
+        // ---- PARTICIPANT APPROVED ----
+        const onParticipantApproved = ({ userId }) => {
+            if (userId === user._id) {
+                setApproved(true);     // 🔥 update local state
+                navigate(`/interview/${roomId}`);
             }
         };
 
 
 
-
-        const onStudentRejected = ({ studentId }) => {
-            if (isStudent && studentId === user._id) {
-                alert("Interviewer rejected your request");
+        // ---- PARTICIPANT REJECTED ----
+        const onParticipantRejected = ({ userId }) => {
+            if (!isCreator && userId === user._id) {
+                alert("Host rejected your request");
                 navigate(`/interview/lobby/${roomId}`);
             }
         };
 
-        const onInterviewerApproved = ({ userId }) => {
-            if (userId === user._id) {
-                window.location.reload();
-            }
-        };
-
-        socket.on("interviewer-approved", onInterviewerApproved);
-        socket.on("student-rejected", onStudentRejected);
+        // ---- SOCKET LISTENERS ----
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
-        socket.on("student-join-request", onStudentJoinRequest);
-        socket.on("student-approved", onStudentApproved);
+        socket.on("join-request", onJoinRequest);
+        socket.on("participant-approved", onParticipantApproved);
+        socket.on("participant-rejected", onParticipantRejected);
 
+        // ---- CLEANUP ----
         return () => {
             socket.off("cheat-event", onCheatEvent);
             socket.off("problem-assigned", onProblemAssigned);
             socket.off("hints-visibility", onHintsVisibility);
-            socket.off("student-join-request", onStudentJoinRequest);
-            socket.off("student-approved", onStudentApproved);
-            socket.off("student-rejected", onStudentRejected);
-            socket.off("interviewer-approved", onInterviewerApproved);
-
+            socket.off("join-request", onJoinRequest);
+            socket.off("participant-approved", onParticipantApproved);
+            socket.off("participant-rejected", onParticipantRejected);
         };
-    }, [roomId]);   // ✅ only roomId
+    }, [roomId, isCreator, navigate, user]
+    );
 
     useEffect(() => {
         if (!isInterviewer) return;
@@ -200,6 +191,7 @@ export default function InterviewRoom() {
             .then(res => setPendingStudents(res.data))
             .catch(() => { });
     }, [isInterviewer, roomId]);
+
 
 
 
@@ -272,21 +264,17 @@ export default function InterviewRoom() {
             console.error("Assign problem failed", err.response?.data);
         }
     };
-
-    const approveStudent = async (studentId) => {
-        await api.post("/interview/approve-student", { roomId, studentId });
-
-        setPendingStudents(prev =>
-            prev.filter(s => s.userId._id !== studentId)
-        );
+    const approve = async (userId) => {
+        await api.post("/interview/approve", { roomId, userId });
+        const res = await api.get(`/interview/pending/${roomId}`);
+        setPendingStudents(res.data);
     };
 
-    const rejectStudent = async (studentId) => {
-        await api.post("/interview/reject-student", { roomId, studentId });
 
-        setPendingStudents(prev =>
-            prev.filter(s => s.userId._id !== studentId)
-        );
+    const reject = async (userId) => {
+        await api.post("/interview/reject", { roomId, userId });
+        const res = await api.get(`/interview/pending/${roomId}`);
+        setPendingStudents(res.data);
     };
 
 
@@ -295,13 +283,17 @@ export default function InterviewRoom() {
 
     if (loading) return <Loader />;
 
-    if (isStudent && !approved) {
+    // 🚫 Never block host
+    if (!loading && !isCreator && !approved) {
         return (
             <div className="h-screen flex items-center justify-center text-sm opacity-70">
-                ⏳ Waiting for interviewer to approve you...
+                ⏳ Waiting for host approval...
             </div>
         );
     }
+
+
+
     if (isStudent && !interviewerJoined) {
         return (
             <div className="h-screen flex items-center justify-center text-sm opacity-70">
@@ -443,25 +435,27 @@ export default function InterviewRoom() {
                     )}
 
                     {isInterviewer && pendingStudents.length > 0 && (
-                        <div className="border rounded p-2 text-xs">
-                            <p className="font-semibold text-[var(--accent)] mb-2">
+                        <div className="border rounded p-3 text-xs bg-[var(--background)]">
+                            <p className="font-semibold text-[var(--accent)] mb-3">
                                 Join Requests
                             </p>
 
-                            {pendingStudents.map(s => (
-                                <div key={s._id} className="flex justify-between items-center mb-1">
-                                    <span>{s.userId.name || s.userId.email}</span>
+                            {pendingStudents.map(p => (
+                                <div key={p.userId} className="flex justify-between items-center">
+                                    <span>
+                                        {p.name} ({p.role})
+                                    </span>
 
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => approveStudent(s.userId._id)}
+                                            onClick={() => approve(p.userId)}
                                             className="px-2 py-1 bg-green-500/15 text-green-600 rounded"
                                         >
                                             Approve
                                         </button>
 
                                         <button
-                                            onClick={() => rejectStudent(s.userId._id)}
+                                            onClick={() => reject(p.userId)}
                                             className="px-2 py-1 bg-red-500/15 text-red-600 rounded"
                                         >
                                             Reject
@@ -469,8 +463,10 @@ export default function InterviewRoom() {
                                     </div>
                                 </div>
                             ))}
+
                         </div>
                     )}
+
                 </aside>
 
 

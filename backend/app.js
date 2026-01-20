@@ -1,3 +1,4 @@
+// app.js
 import express from "express";
 import cors from "cors";
 import fileUpload from "express-fileupload";
@@ -9,11 +10,9 @@ import interviewRoutes from "./routes/interviewRoutes.js";
 
 import "./config/firebaseAdmin.js";
 
-
-
 const app = express();
 
-/* ================= GLOBAL MIDDLEWARE ================= */
+/* ===== GLOBAL MIDDLEWARE ===== */
 
 app.use(cors({
   origin: "http://localhost:5173",
@@ -24,15 +23,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  fileUpload({
-    useTempFiles: true,
-    tempFileDir: "/tmp/",
-  })
-);
+app.use(fileUpload({
+  useTempFiles: true,
+  tempFileDir: "/tmp/",
+}));
 
-/* ================= SOCKET INJECTOR ================= */
-/* This ensures req.io is available inside ALL controllers */
+/* ===== SOCKET INJECTOR ===== */
+// This makes req.io available in all controllers
 export const setIO = (io) => {
   app.use((req, res, next) => {
     req.io = io;
@@ -40,7 +37,7 @@ export const setIO = (io) => {
   });
 };
 
-/* ================= ROUTES ================= */
+/* ===== ROUTES ===== */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
