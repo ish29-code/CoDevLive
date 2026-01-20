@@ -108,18 +108,36 @@ export default function InterviewRoom() {
         loadInterview();
     }, [roomId]);
 
+    // 2️⃣ 🔥 Add this right below
+    useEffect(() => {
+        if (approved || isCreator) return;
 
+        const interval = setInterval(async () => {
+            const res = await api.get(`/interview/${roomId}`);
+            if (res.data.approved) {
+                setApproved(true);
+            }
+        }, 1000);
 
-
-
+        return () => clearInterval(interval);
+    }, [approved, isCreator, roomId]);
 
 
 
     useEffect(() => {
         if (!roomId) return;
 
-        // Join websocket room
-        socket.emit("join-room", roomId);
+        if (!joinedRef.current) {
+            socket.emit("join-room", roomId);
+            joinedRef.current = true;
+        }
+    }, [roomId]);
+
+
+
+
+
+    useEffect(() => {
 
         // ---- CHEAT EVENTS ----
         const onCheatEvent = (e) => {
@@ -146,31 +164,31 @@ export default function InterviewRoom() {
             setPendingStudents(prev => [...prev, participant]);
         };
 
-        // ---- PARTICIPANT APPROVED ----
+        /*// ---- PARTICIPANT APPROVED ----
         const onParticipantApproved = ({ userId }) => {
+            console.log("🔥 APPROVAL EVENT RECEIVED", userId);
+
             if (userId === user._id) {
-                setApproved(true);     // 🔥 update local state
+                console.log("✅ THIS USER APPROVED");
+                setApproved(true);
                 navigate(`/interview/${roomId}`);
             }
         };
-
-
-
         // ---- PARTICIPANT REJECTED ----
         const onParticipantRejected = ({ userId }) => {
             if (!isCreator && userId === user._id) {
                 alert("Host rejected your request");
                 navigate(`/interview/lobby/${roomId}`);
             }
-        };
+        };*/
 
         // ---- SOCKET LISTENERS ----
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
         socket.on("join-request", onJoinRequest);
-        socket.on("participant-approved", onParticipantApproved);
-        socket.on("participant-rejected", onParticipantRejected);
+        /* socket.on("participant-approved", onParticipantApproved);
+         socket.on("participant-rejected", onParticipantRejected);*/
 
         // ---- CLEANUP ----
         return () => {
@@ -178,8 +196,8 @@ export default function InterviewRoom() {
             socket.off("problem-assigned", onProblemAssigned);
             socket.off("hints-visibility", onHintsVisibility);
             socket.off("join-request", onJoinRequest);
-            socket.off("participant-approved", onParticipantApproved);
-            socket.off("participant-rejected", onParticipantRejected);
+            /*socket.off("participant-approved", onParticipantApproved);
+            socket.off("participant-rejected", onParticipantRejected);*/
         };
     }, [roomId, isCreator, navigate, user]
     );
@@ -278,19 +296,17 @@ export default function InterviewRoom() {
     };
 
 
-
-
-
     if (loading) return <Loader />;
 
-    // 🚫 Never block host
-    if (!loading && !isCreator && !approved) {
+    // ✅ Waiting screen (keeps socket listeners alive)
+    if (!approved && !isCreator) {
         return (
             <div className="h-screen flex items-center justify-center text-sm opacity-70">
                 ⏳ Waiting for host approval...
             </div>
         );
     }
+
 
 
 
