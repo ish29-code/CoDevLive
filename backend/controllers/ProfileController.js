@@ -3,7 +3,7 @@ import cloudinary from "../Utils/cloudinary.js";
 
 export const upsertProfile = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user.id;
 
         const {
             name,
@@ -87,7 +87,7 @@ export const upsertProfile = async (req, res) => {
 /* ================= GET PROFILE ================= */
 export const getMyProfile = async (req, res) => {
     try {
-        const profile = await Profile.findOne({ user: req.user._id });
+        const profile = await Profile.findOne({ user: req.user.id });
 
         if (!profile) {
             return res.status(404).json({ message: "Profile not found" });

@@ -76,52 +76,28 @@ export default function InterviewRoom() {
     const [showEval, setShowEval] = useState(false);
 
 
-
     useEffect(() => {
         const loadInterview = async () => {
-            try {
-                const res = await api.get(`/interview/${roomId}`);
+            const res = await api.get(`/interview/${roomId}`);
+            const data = res.data;
 
-                const data = res.data;
+            setMyRole(data.myRole);
+            setIsCreator(data.isCreator);
+            setInterviewerJoined(data.interviewerJoined);
+            setProblemAssigned(!!data.problemId);
+            setApproved(Boolean(data.approved));
 
-                setMyRole(data.myRole);
-                setIsCreator(data.isCreator);
-                setInterviewerJoined(data.interviewerJoined);
-                setProblemAssigned(!!data.problemId);
-                setApproved(Boolean(data.approved));
-
-
-                if (data.problemId) {
-                    const p = problems[data.problemId];
-                    setProblem(p);
-                    setCode(p.starterCode);
-                } else {
-                    setProblem(null);
-                }
-
-                setLoading(false);
-            } catch (err) {
-                console.error("Failed to load interview:", err);
+            if (data.problemId) {
+                const p = problems[data.problemId];
+                setProblem(p);
+                setCode(p.starterCode);
             }
+
+            setLoading(false);
         };
 
         loadInterview();
     }, [roomId]);
-
-    // 2️⃣ 🔥 Add this right below
-    useEffect(() => {
-        if (approved || isCreator) return;
-
-        const interval = setInterval(async () => {
-            const res = await api.get(`/interview/${roomId}`);
-            if (res.data.approved) {
-                setApproved(true);
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [approved, isCreator, roomId]);
-
 
 
     useEffect(() => {
@@ -132,9 +108,6 @@ export default function InterviewRoom() {
             joinedRef.current = true;
         }
     }, [roomId]);
-
-
-
 
 
     useEffect(() => {
@@ -155,9 +128,11 @@ export default function InterviewRoom() {
         };
 
         // ---- HINT VISIBILITY ----
-        const onHintsVisibility = (show) => {
+        const onHintsVisibility = ({ show, count }) => {
             setHintsVisible(show);
+            setHintsUsed(count);
         };
+
 
         // ---- HOST RECEIVES JOIN REQUESTS ----
         const onJoinRequest = (participant) => {
@@ -209,8 +184,6 @@ export default function InterviewRoom() {
             .then(res => setPendingStudents(res.data))
             .catch(() => { });
     }, [isInterviewer, roomId]);
-
-
 
 
     /* ================= ANTI-CHEAT ================= */
@@ -298,18 +271,6 @@ export default function InterviewRoom() {
 
     if (loading) return <Loader />;
 
-    // ✅ Waiting screen (keeps socket listeners alive)
-    if (!approved && !isCreator) {
-        return (
-            <div className="h-screen flex items-center justify-center text-sm opacity-70">
-                ⏳ Waiting for host approval...
-            </div>
-        );
-    }
-
-
-
-
     if (isStudent && !interviewerJoined) {
         return (
             <div className="h-screen flex items-center justify-center text-sm opacity-70">
@@ -329,16 +290,6 @@ export default function InterviewRoom() {
 
                 {/* ================= LEFT ================= */}
                 <aside className="col-span-3 card-ui p-4 text-sm overflow-y-auto space-y-4">
-
-
-
-
-                    {/* STUDENT — interviewer not joined */}
-                    {isStudent && !interviewerJoined && (
-                        <div className="text-sm opacity-70">
-                            ⏳ Waiting for interviewer to join...
-                        </div>
-                    )}
 
                     {/* STUDENT — interviewer joined but problem not assigned */}
                     {isStudent && interviewerJoined && !problemAssigned && (
@@ -397,17 +348,18 @@ export default function InterviewRoom() {
                                             <Lightbulb size={12} /> Hints
                                         </div>
 
-                                        <button
+                                        <button className="cursor-pointer"
                                             onClick={() =>
                                                 socket.emit("toggle-hints", {
                                                     roomId,
                                                     show: true,
+                                                    count: hintsUsed   // send current unlocked count
                                                 })
                                             }
-                                            className="text-xs underline"
                                         >
                                             Show to student
                                         </button>
+
                                     </div>
 
                                     {problem.hints.map((h, i) => (
@@ -450,7 +402,7 @@ export default function InterviewRoom() {
                         </>
                     )}
 
-                    {isInterviewer && pendingStudents.length > 0 && (
+                    {isCreator && pendingStudents.length > 0 && (
                         <div className="border rounded p-3 text-xs bg-[var(--background)]">
                             <p className="font-semibold text-[var(--accent)] mb-3">
                                 Join Requests

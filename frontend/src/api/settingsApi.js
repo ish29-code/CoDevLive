@@ -1,12 +1,8 @@
+import { authHeader } from "@/services/authHeader";
+
+
 const BASE_URL = "http://localhost:5000/api/settings";
 
-/* ================= AUTH HEADER ================= */
-const authHeader = () => {
-    const token = localStorage.getItem("token");
-    return {
-        Authorization: `Bearer ${token}`,
-    };
-};
 
 /* ================= GET SETTINGS ================= */
 export const getSettings = async () => {

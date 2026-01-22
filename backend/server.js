@@ -7,6 +7,10 @@ import app, { setIO } from "./app.js";
 import connectDB from "./config/db.js";
 import { setupSocket } from "./socket.js";
 
+/* 🔥 Redis Adapter */
+import { createAdapter } from "@socket.io/redis-adapter";
+import { pubClient, subClient } from "./config/socketRedis.js";
+
 /* ================= ENV ================= */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +36,8 @@ const server = http.createServer(app);
 /* ================= SOCKET ================= */
 
 const io = setupSocket(server);
+
+io.adapter(createAdapter(pubClient, subClient));
 
 /* 🔥 Inject io into express so controllers get req.io */
 setIO(io);

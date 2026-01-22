@@ -35,9 +35,10 @@ export const setupSocket = (server) => {
             socket.to(roomId).emit("ice-candidate", candidate);
         });
 
-        socket.on("toggle-hints", ({ roomId, show }) => {
-            socket.to(roomId).emit("hints-visibility", show);
+        socket.on("toggle-hints", ({ roomId, show, count }) => {
+            socket.to(roomId).emit("hints-visibility", { show, count });
         });
+
 
         socket.on("disconnect", () => {
             console.log("❌ User disconnected:", socket.id);

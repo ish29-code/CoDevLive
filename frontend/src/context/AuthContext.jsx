@@ -14,6 +14,8 @@ import {
   signup as signupService,
 } from "../services/authService";
 import { forgotPasswordLocal } from "../api/userApi";
+import authHeader from "@/services/authHeader";
+//import { a } from "framer-motion/dist/types.d-Cjd591yU";
 
 const AuthContext = createContext();
 
@@ -41,7 +43,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const res = await fetch("http://localhost:5000/api/profile/me", {
             headers: {
-              Authorization: `Bearer ${token}`,
+              ...authHeader(),
             },
           });
 
@@ -129,8 +131,8 @@ export const AuthProvider = ({ children }) => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${idToken}`,
             "Content-Type": "application/json",
+            ...authHeader(),
           },
           body: JSON.stringify({}),
         }

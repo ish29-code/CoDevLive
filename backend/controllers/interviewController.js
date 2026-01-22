@@ -40,19 +40,24 @@ export const joinInterview = async (req, res) => {
     }
 
     // ✅ 2. Already joined user
+    // 2. Already joined user
     const existing = await InterviewParticipant.findOne({
         interviewId: interview._id,
         userId
     });
 
     if (existing) {
+        // 🔥 Re-fetch fresh copy from DB to avoid stale status
+        const participant = await InterviewParticipant
+            .findOne({ interviewId: interview._id, userId })
+            .lean();
+
         return res.json({
-            role: existing.role,
-            status: existing.status,
+            role: participant.role,
+            status: participant.status,   // ✅ now latest (approved if host approved)
             direct: false
         });
     }
-
     // ✅ 3. New participant → pending
     await InterviewParticipant.create({
         interviewId: interview._id,
@@ -67,7 +72,7 @@ export const joinInterview = async (req, res) => {
     const io = getIO();
     io.to(roomId).emit("join-request", {
         userId,
-        name: req.user.name,
+        name: req.user.fullName || req.user.email,
         requestedRole: role
     });
 
@@ -161,10 +166,14 @@ export const getInterview = async (req, res) => {
 
     const userId = req.user.id;
 
-    let myParticipant = await InterviewParticipant.findOne({
+    const myParticipant = await InterviewParticipant.findOne({
         interviewId: interview._id,
-        userId
-    });
+        userId: req.user.id
+    }).lean();
+
+    const approved = myParticipant ? myParticipant.status === "approved" : false;
+
+
 
     // 🔥 auto-create host participant
     if (!myParticipant && interview.createdBy.toString() === userId.toString()) {
@@ -182,7 +191,12 @@ export const getInterview = async (req, res) => {
         status: "approved"
     });
 
-    const approved = myParticipant?.status === "approved";
+    console.log("GET INTERVIEW:", {
+        user: req.user.id,
+        participant: myParticipant
+    });
+
+
 
     res.json({
         roomId: interview.roomId,
@@ -286,7 +300,7 @@ export const approveParticipant = async (req, res) => {
     const participant = await InterviewParticipant.findOneAndUpdate(
         { interviewId: interview._id, userId },
         { status: "approved" },
-        { new: true }
+        { new: true }   // 🔥 must be present
     );
 
     console.log("PARTICIPANT FOUND:", participant);
@@ -294,7 +308,7 @@ export const approveParticipant = async (req, res) => {
     // 🔔 Notify via socket
     const io = getIO();
     io.to(roomId).emit("participant-approved", {
-        userId,
+        userId: userId,
         role: participant.role
     });
 
@@ -345,7 +359,7 @@ export const rejectParticipant = async (req, res) => {
 
     await InterviewParticipant.deleteOne({
         interviewId: interview._id,
-        userId,
+        userId: userId,
         status: "pending"
     });
 

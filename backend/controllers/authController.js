@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import Settings from "../models/Settings.js";
 import bcrypt from "bcryptjs";
 import { sendEmail } from "../Utils/sendEmail.js";
+import { emailQueue } from "../queues/emailQueue.js";
+
 
 
 /* ================= HELPER ================= */
@@ -61,12 +63,15 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // 🔥 CRITICAL FIX
+    // allow local password if exists
+    // If user has password → allow local login
     if (user.provider !== "local") {
       return res.status(400).json({
-        message: "This account uses Google/GitHub login",
+        message: "This account uses local login. Please use social login.",
       });
     }
+
+
 
     if (!user.password) {
       return res.status(400).json({ message: "Password not set" });
@@ -81,6 +86,17 @@ export const login = async (req, res) => {
     }
 
     const token = generateToken(user._id);
+
+    // 🔥 Push Email Job to Redis Queue
+    await emailQueue.add("sendWelcomeEmail", {
+      to: user.email,
+      subject: "Welcome back to CoDevLive 🚀",
+      html: `
+    <h2>Welcome back, ${user.fullName}!</h2>
+    <p>We're excited to see you again on CoDevLive.</p>
+    <p>Happy Coding 💻</p>
+  `,
+    });
 
     res.json({
       success: true,
@@ -164,6 +180,7 @@ export const forgotPassword = async (req, res) => {
     const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
 
     // 📧 Send email
+    console.log("📥 Adding email job for:", user.email);
     await sendEmail({
       to: user.email,
       subject: "Reset your CoDevLive password",
@@ -179,6 +196,20 @@ export const forgotPassword = async (req, res) => {
       success: true,
       message: "Password reset email sent",
     });
+
+    // ======================
+    // 🔹 FIREBASE USER RESET
+    // ======================
+    if (user.provider === "google" || user.provider === "github" || user.provider === "firebase") {
+      // 🔥 Let frontend Firebase SDK handle reset
+      return res.json({
+        success: true,
+        provider: "firebase",
+        message: "Use Firebase password reset",
+      });
+    }
+
+    res.status(400).json({ message: "Unsupported provider" });
   } catch (err) {
     console.error("FORGOT PASSWORD ERROR:", err);
     res.status(500).json({

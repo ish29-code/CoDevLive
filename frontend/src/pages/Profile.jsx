@@ -47,7 +47,10 @@ export default function Profile() {
         }
 
         const res = await fetch("http://localhost:5000/api/profile/me", {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "x-auth-type": user?.provider === "local" ? "jwt" : "firebase"
+          },
         });
 
         if (res.ok) {
@@ -134,7 +137,10 @@ export default function Profile() {
 
       const res = await fetch("http://localhost:5000/api/profile/me", {
         method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-auth-type": user?.provider === "local" ? "jwt" : "firebase"
+        },
         body: formData,
       });
 
