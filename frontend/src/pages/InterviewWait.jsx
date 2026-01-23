@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/axios";
+import { toast } from "sonner";
 
 export default function InterviewWait() {
     const { roomId } = useParams();
@@ -40,8 +41,12 @@ export default function InterviewWait() {
                 if (res.data.approved === true) {
                     navigate(`/interview/${roomId}`);
                 }
+                else {
+                    navigate(`/interview/lobby/${roomId}`);
+                    toast.error("Your interviewer has rejected your request to join the interview.");
+                }
             } catch { }
-        }, 1000);
+        }, 3000);
 
         return () => clearInterval(interval);
     }, [roomId, navigate]);

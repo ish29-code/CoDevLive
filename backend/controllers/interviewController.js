@@ -41,7 +41,7 @@ export const joinInterview = async (req, res) => {
 
     // ✅ 2. Already joined user
     // 2. Already joined user
-    const existing = await InterviewParticipant.findOne({
+    /*const existing = await InterviewParticipant.findOne({
         interviewId: interview._id,
         userId
     });
@@ -57,7 +57,8 @@ export const joinInterview = async (req, res) => {
             status: participant.status,   // ✅ now latest (approved if host approved)
             direct: false
         });
-    }
+    }*/
+
     // ✅ 3. New participant → pending
     await InterviewParticipant.create({
         interviewId: interview._id,

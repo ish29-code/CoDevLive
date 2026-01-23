@@ -49,3 +49,5 @@ export const setupSocket = (server) => {
 };
 
 export const getIO = () => io;
+
+// backend/socket.js

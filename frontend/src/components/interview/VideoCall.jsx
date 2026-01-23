@@ -1,150 +1,149 @@
-// src/components/VideoCall.jsx
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, Monitor } from "lucide-react";
 import { socket } from "../../utils/socket";
 
-export default function VideoCall({ roomId }) {
-    const localRef = useRef(null);
-    const remoteRef = useRef(null);
-    const pcRef = useRef(null);
-    const streamRef = useRef(null);
+const ICE = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
+export default function VideoCall({ roomId }) {
+    const localRef = useRef();
+    const streamRef = useRef();
+    const pcsRef = useRef({}); // 🔥 multiple peer connections
+
+    const [remoteStreams, setRemoteStreams] = useState([]);
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
-    const [screenOn, setScreenOn] = useState(false);
-    const [status, setStatus] = useState("Connecting");
 
-    /* ================= INIT ================= */
+    // ---------- INIT ----------
     useEffect(() => {
         let mounted = true;
 
         const init = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true,
-                });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            if (!mounted) return;
 
-                if (!mounted) return;
+            streamRef.current = stream;
+            localRef.current.srcObject = stream;
 
-                streamRef.current = stream;
-                localRef.current.srcObject = stream;
+            socket.emit("join-room", roomId);
 
-                const pc = new RTCPeerConnection({
-                    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-                });
-                pcRef.current = pc;
+            // Receive existing users
+            socket.on("all-users", async (users) => {
+                for (const userId of users) {
+                    const pc = createPeer(userId);
+                    pcsRef.current[userId] = pc;
 
-                stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-                pc.ontrack = (e) => {
-                    remoteRef.current.srcObject = e.streams[0];
-                    setStatus("Live");
-                };
-
-                pc.onicecandidate = (e) => {
-                    if (e.candidate) {
-                        socket.emit("ice-candidate", { roomId, candidate: e.candidate });
-                    }
-                };
-
-                pc.onconnectionstatechange = () => {
-                    if (pc.connectionState === "connected") setStatus("Live");
-                    if (pc.connectionState === "disconnected") setStatus("Disconnected");
-                };
-
-                /* ===== SOCKET ===== */
-                socket.emit("join-room", roomId);
-
-                socket.on("user-joined", async () => {
-                    // 👇 AUTO CREATE OFFER
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
-                    socket.emit("webrtc-offer", { roomId, offer });
-                });
+                    socket.emit("webrtc-offer", { to: userId, offer });
+                }
+            });
 
-                socket.on("webrtc-offer", async (offer) => {
-                    await pc.setRemoteDescription(offer);
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    socket.emit("webrtc-answer", { roomId, answer });
-                });
+            // When new user joins later
+            socket.on("user-joined", async (userId) => {
+                const pc = createPeer(userId);
+                pcsRef.current[userId] = pc;
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            });
 
-                socket.on("webrtc-answer", async (answer) => {
-                    await pc.setRemoteDescription(answer);
-                });
+            // Receive offer
+            socket.on("webrtc-offer", async ({ from, offer }) => {
+                const pc = createPeer(from);
+                pcsRef.current[from] = pc;
 
-                socket.on("ice-candidate", async (candidate) => {
-                    await pc.addIceCandidate(candidate);
-                });
-            } catch (err) {
-                console.error("VideoCall error:", err);
-            }
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+                await pc.setRemoteDescription(offer);
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit("webrtc-answer", { to: from, answer });
+            });
+
+            // Receive answer
+            socket.on("webrtc-answer", async ({ from, answer }) => {
+                await pcsRef.current[from].setRemoteDescription(answer);
+            });
+
+            // ICE
+            socket.on("ice-candidate", ({ from, candidate }) => {
+                pcsRef.current[from]?.addIceCandidate(candidate);
+            });
+
+            // User left
+            socket.on("user-left", (userId) => {
+                pcsRef.current[userId]?.close();
+                delete pcsRef.current[userId];
+                setRemoteStreams(prev => prev.filter(r => r.id !== userId));
+            });
         };
 
         init();
 
         return () => {
             mounted = false;
+            socket.off("all-users");
             socket.off("user-joined");
             socket.off("webrtc-offer");
             socket.off("webrtc-answer");
             socket.off("ice-candidate");
-
-            pcRef.current?.close();
-            streamRef.current?.getTracks().forEach((t) => t.stop());
+            socket.off("user-left");
+            Object.values(pcsRef.current).forEach(pc => pc.close());
+            streamRef.current?.getTracks().forEach(t => t.stop());
         };
     }, [roomId]);
 
-    /* ================= CONTROLS ================= */
+    // ---------- CREATE PEER ----------
+    function createPeer(userId) {
+        const pc = new RTCPeerConnection(ICE);
 
+        pc.onicecandidate = (e) => {
+            if (e.candidate) {
+                socket.emit("ice-candidate", { to: userId, candidate: e.candidate });
+            }
+        };
+
+        pc.ontrack = (e) => {
+            setRemoteStreams(prev => {
+                const exists = prev.find(p => p.id === userId);
+                if (exists) return prev;
+                return [...prev, { id: userId, stream: e.streams[0] }];
+            });
+        };
+
+        return pc;
+    }
+
+    // ---------- CONTROLS ----------
     const toggleMic = () => {
-        streamRef.current.getAudioTracks().forEach((t) => (t.enabled = !micOn));
+        streamRef.current.getAudioTracks().forEach(t => t.enabled = !micOn);
         setMicOn(!micOn);
     };
 
     const toggleCam = () => {
-        streamRef.current.getVideoTracks().forEach((t) => (t.enabled = !camOn));
+        streamRef.current.getVideoTracks().forEach(t => t.enabled = !camOn);
         setCamOn(!camOn);
     };
 
-    const toggleScreen = async () => {
-        if (!screenOn) {
-            const screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const screenTrack = screen.getTracks()[0];
-            const sender = pcRef.current
-                .getSenders()
-                .find((s) => s.track.kind === "video");
-
-            sender.replaceTrack(screenTrack);
-            screenTrack.onended = toggleScreen;
-            setScreenOn(true);
-        } else {
-            const camTrack = streamRef.current.getVideoTracks()[0];
-            const sender = pcRef.current
-                .getSenders()
-                .find((s) => s.track.kind === "video");
-
-            sender.replaceTrack(camTrack);
-            setScreenOn(false);
-        }
-    };
-
-    /* ================= UI ================= */
+    // ---------- UI ----------
     return (
         <div className="space-y-2">
-            {/* STATUS */}
-            <p className="text-xs text-center opacity-70">
-                Status: <span className="font-semibold">{status}</span>
-            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+                {/* Local */}
+                <video ref={localRef} autoPlay muted playsInline className="w-28 rounded" />
 
-            {/* VIDEOS */}
-            <div className="flex justify-center gap-3">
-                <video ref={localRef} autoPlay muted playsInline className="w-28 rounded-lg" />
-                <video ref={remoteRef} autoPlay playsInline className="w-28 rounded-lg" />
+                {/* Remotes */}
+                {remoteStreams.map(r => (
+                    <video
+                        key={r.id}
+                        autoPlay
+                        playsInline
+                        className="w-28 rounded"
+                        ref={el => { if (el) el.srcObject = r.stream; }}
+                    />
+                ))}
             </div>
 
-            {/* CONTROLS */}
             <div className="flex justify-center gap-3 mt-2">
                 <button onClick={toggleMic} className="btn-outline p-2">
                     {micOn ? <Mic size={16} /> : <MicOff size={16} />}
@@ -154,7 +153,7 @@ export default function VideoCall({ roomId }) {
                     {camOn ? <Video size={16} /> : <VideoOff size={16} />}
                 </button>
 
-                <button onClick={toggleScreen} className="btn-outline p-2">
+                <button className="btn-outline p-2">
                     <Monitor size={16} />
                 </button>
             </div>

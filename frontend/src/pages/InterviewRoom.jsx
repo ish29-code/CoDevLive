@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 
+
 /* ================= INLINE RUN LOADER ================= */
 function RunLoader() {
     return (
@@ -139,31 +140,32 @@ export default function InterviewRoom() {
             setPendingStudents(prev => [...prev, participant]);
         };
 
-        /*// ---- PARTICIPANT APPROVED ----
+        // ---- PARTICIPANT APPROVED ----
         const onParticipantApproved = ({ userId }) => {
-            console.log("🔥 APPROVAL EVENT RECEIVED", userId);
 
-            if (userId === user._id) {
-                console.log("✅ THIS USER APPROVED");
-                setApproved(true);
-                navigate(`/interview/${roomId}`);
-            }
-        };
-        // ---- PARTICIPANT REJECTED ----
+            // Interviewers → remove from pending list
+            setPendingStudents(prev =>
+                prev.filter(p => p.userId !== userId)
+            );
+        }
+
         const onParticipantRejected = ({ userId }) => {
-            if (!isCreator && userId === user._id) {
-                alert("Host rejected your request");
-                navigate(`/interview/lobby/${roomId}`);
-            }
-        };*/
+
+            // Interviewers → remove from pending list
+            setPendingStudents(prev =>
+                prev.filter(p => p.userId !== userId)
+            );
+        }
+
+
 
         // ---- SOCKET LISTENERS ----
         socket.on("cheat-event", onCheatEvent);
         socket.on("problem-assigned", onProblemAssigned);
         socket.on("hints-visibility", onHintsVisibility);
         socket.on("join-request", onJoinRequest);
-        /* socket.on("participant-approved", onParticipantApproved);
-         socket.on("participant-rejected", onParticipantRejected);*/
+        socket.on("participant-approved", onParticipantApproved);
+        socket.on("participant-rejected", onParticipantRejected);
 
         // ---- CLEANUP ----
         return () => {
@@ -171,19 +173,26 @@ export default function InterviewRoom() {
             socket.off("problem-assigned", onProblemAssigned);
             socket.off("hints-visibility", onHintsVisibility);
             socket.off("join-request", onJoinRequest);
-            /*socket.off("participant-approved", onParticipantApproved);
-            socket.off("participant-rejected", onParticipantRejected);*/
+            socket.off("participant-approved", onParticipantApproved);
+            socket.off("participant-rejected", onParticipantRejected);
         };
     }, [roomId, isCreator, navigate, user]
     );
 
-    useEffect(() => {
+    /*useEffect(() => {
         if (!isInterviewer) return;
 
         api.get(`/interview/pending/${roomId}`)
             .then(res => setPendingStudents(res.data))
             .catch(() => { });
+    }, [isInterviewer, roomId]);*/
+
+    useEffect(() => {
+        if (!isInterviewer) return;
+        api.get(`/interview/pending/${roomId}`)
+            .then(res => setPendingStudents(res.data))
     }, [isInterviewer, roomId]);
+
 
 
     /* ================= ANTI-CHEAT ================= */
@@ -255,7 +264,7 @@ export default function InterviewRoom() {
             console.error("Assign problem failed", err.response?.data);
         }
     };
-    const approve = async (userId) => {
+    /*const approve = async (userId) => {
         await api.post("/interview/approve", { roomId, userId });
         const res = await api.get(`/interview/pending/${roomId}`);
         setPendingStudents(res.data);
@@ -266,7 +275,15 @@ export default function InterviewRoom() {
         await api.post("/interview/reject", { roomId, userId });
         const res = await api.get(`/interview/pending/${roomId}`);
         setPendingStudents(res.data);
-    };
+    };*/
+
+    const approve = (userId) =>
+        api.post("/interview/approve", { roomId, userId });
+
+    const reject = (userId) =>
+        api.post("/interview/reject", { roomId, userId });
+
+
 
 
     if (loading) return <Loader />;
@@ -402,7 +419,7 @@ export default function InterviewRoom() {
                         </>
                     )}
 
-                    {isCreator && pendingStudents.length > 0 && (
+                    {isInterviewer && pendingStudents.length > 0 && (
                         <div className="border rounded p-3 text-xs bg-[var(--background)]">
                             <p className="font-semibold text-[var(--accent)] mb-3">
                                 Join Requests
