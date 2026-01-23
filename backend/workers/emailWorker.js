@@ -1,28 +1,28 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { Worker } from "bullmq";
 import { sendEmail } from "../Utils/sendEmail.js";
 import { redisConnection } from "../config/redis.js";
+
+console.log("📨 Email Worker started...");
+
 const emailWorker = new Worker(
     "emailQueue",
     async (job) => {
-        try {
-            console.log("🔥 Worker received job:", job.data.to);
+        console.log("🔥 Worker received job:", job.data.to);
 
-            await sendEmail(job.data);
+        const { to, subject, html } = job.data;
 
-            console.log("✅ Email sent to:", job.data.to);
-        } catch (err) {
-            console.error("❌ Nodemailer error:", err.message);
-        }
+        await sendEmail({ to, subject, html });
+
+        console.log("✅ Email sent to:", to);
     },
-    { connection: redisConnection }
+    {
+        connection: redisConnection,
+    }
 );
 
-emailWorker.on("completed", (job) => {
-    console.log(`🎉 Job ${job.id} has been completed`);
-});
-
 emailWorker.on("failed", (job, err) => {
-    console.log(`❌ Job ${job.id} has failed with error: ${err.message}`);
+    console.error("❌ Email job failed:", err.message);
 });
-
-export default emailWorker; 

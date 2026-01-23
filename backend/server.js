@@ -10,7 +10,6 @@ import { setupSocket } from "./socket.js";
 /* 🔥 Redis Adapter */
 import { createAdapter } from "@socket.io/redis-adapter";
 import { pubClient, subClient } from "./config/socketRedis.js";
-
 /* ================= ENV ================= */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,3 +46,5 @@ setIO(io);
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+

@@ -121,7 +121,8 @@ export const AuthProvider = ({ children }) => {
   const handleSocialSignIn = async (provider) => {
     const result = await signInWithPopup(auth, provider);
     const firebaseUser = result.user;
-    const idToken = await getIdToken(firebaseUser);
+    const idToken = await firebaseUser.getIdToken(true);
+    // true = force refresh fresh token
 
     localStorage.setItem("token", idToken);
 
