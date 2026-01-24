@@ -14,7 +14,6 @@ import {
     approveParticipant,
     rejectParticipant,
 } from "../controllers/interviewController.js";
-
 const router = express.Router();
 /* CREATE INTERVIEW */
 router.post("/create", protect, createInterview);
