@@ -30,5 +30,4 @@ router.post("/approve", protect, approveParticipant);
 router.get("/pending/:roomId", protect, getPending);
 router.post("/reject", protect, rejectParticipant);
 router.post("/add-interviewer", protect, addInterviewer);
-
 export default router;
