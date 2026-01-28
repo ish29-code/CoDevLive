@@ -192,10 +192,10 @@ export const getInterview = async (req, res) => {
         status: "approved"
     });
 
-    console.log("GET INTERVIEW:", {
+    /*console.log("GET INTERVIEW:", {
         user: req.user.id,
         participant: myParticipant
-    });
+    });*/
 
 
 
@@ -289,8 +289,8 @@ export const approveParticipant = async (req, res) => {
         return res.status(404).json({ message: "Interview not found" });
 
     // 🔍 DEBUG LOGS — always print first
-    console.log("REQ.USER.ID:", req.user?.id?.toString());
-    console.log("INTERVIEW.CREATEDBY:", interview.createdBy.toString());
+    /*console.log("REQ.USER.ID:", req.user?.id?.toString());
+    console.log("INTERVIEW.CREATEDBY:", interview.createdBy.toString());*/
 
     // ❌ Only host can approve
     if (req.user.id.toString() !== interview.createdBy.toString()) {
@@ -304,7 +304,7 @@ export const approveParticipant = async (req, res) => {
         { new: true }   // 🔥 must be present
     );
 
-    console.log("PARTICIPANT FOUND:", participant);
+    //console.log("PARTICIPANT FOUND:", participant);
 
     // 🔔 Notify via socket
     const io = getIO();
@@ -351,8 +351,8 @@ export const rejectParticipant = async (req, res) => {
     if (!interview)
         return res.status(404).json({ message: "Interview not found" });
 
-    console.log("REQ.USER.ID:", req.user?.id?.toString());
-    console.log("INTERVIEW.CREATEDBY:", interview.createdBy.toString());
+    //console.log("REQ.USER.ID:", req.user?.id?.toString());
+    //console.log("INTERVIEW.CREATEDBY:", interview.createdBy.toString());
 
     if (req.user.id.toString() !== interview.createdBy.toString()) {
         return res.status(403).json({ message: "Only host can reject" });

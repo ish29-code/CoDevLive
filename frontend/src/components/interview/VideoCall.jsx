@@ -12,6 +12,8 @@ export default function VideoCall({ roomId }) {
     const [remoteStreams, setRemoteStreams] = useState([]);
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
+    const [fullScreen, setFullScreen] = useState(false);
+
 
     // ---------- INIT ----------
     useEffect(() => {
@@ -25,6 +27,27 @@ export default function VideoCall({ roomId }) {
             localRef.current.srcObject = stream;
 
             socket.emit("join-room", roomId);
+
+            // Receive existing users
+            /*socket.on("all-users", async (users) => {
+                for (const userId of users) {
+                    const pc = createPeer(userId);
+                    pcsRef.current[userId] = pc;
+
+                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit("webrtc-offer", { to: userId, offer });
+                }
+            });
+
+            // When new user joins later
+            socket.on("user-joined", async (userId) => {
+                const pc = createPeer(userId);
+                pcsRef.current[userId] = pc;
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            });*/
 
             // Receive existing users
             socket.on("all-users", async (users) => {
@@ -44,8 +67,14 @@ export default function VideoCall({ roomId }) {
             socket.on("user-joined", async (userId) => {
                 const pc = createPeer(userId);
                 pcsRef.current[userId] = pc;
+
                 stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit("webrtc-offer", { to: userId, offer });
             });
+
 
             // Receive offer
             socket.on("webrtc-offer", async ({ from, offer }) => {
@@ -125,38 +154,106 @@ export default function VideoCall({ roomId }) {
         setCamOn(!camOn);
     };
 
-    // ---------- UI ----------
+    // ---------- UI ----------//
     return (
-        <div className="space-y-2">
-            <div className="flex flex-wrap justify-center gap-2">
-                {/* Local */}
-                <video ref={localRef} autoPlay muted playsInline className="w-28 rounded" />
+        <div className="relative">
 
-                {/* Remotes */}
-                {remoteStreams.map(r => (
-                    <video
-                        key={r.id}
-                        autoPlay
-                        playsInline
-                        className="w-28 rounded"
-                        ref={el => { if (el) el.srcObject = r.stream; }}
-                    />
-                ))}
-            </div>
+            {/* === SMALL / NORMAL CONTAINER === */}
+            <div
+                className={`transition-all duration-300 ease-in-out
+        ${fullScreen
+                        ? "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
+                        : "w-full"
+                    }`}
+            >
+                {/* === POPUP CARD === */}
+                <div
+                    className={`transition-all duration-300 ease-in-out
+          ${fullScreen
+                            ? "w-[90vw] h-[80vh] bg-[#111] rounded-xl border border-white/10 shadow-xl flex flex-col"
+                            : ""
+                        }`}
+                >
 
-            <div className="flex justify-center gap-3 mt-2">
-                <button onClick={toggleMic} className="btn-outline p-2">
-                    {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-                </button>
+                    {/* === TOP BAR === */}
+                    {fullScreen && (
+                        <div className="flex justify-between items-center px-4 py-2 bg-[#1a1a1a] border-b border-white/10">
+                            <span className="text-sm font-semibold text-white">
+                                CoDevLive Interview
+                            </span>
 
-                <button onClick={toggleCam} className="btn-outline p-2">
-                    {camOn ? <Video size={16} /> : <VideoOff size={16} />}
-                </button>
+                            <button
+                                onClick={() => setFullScreen(false)}
+                                className="text-white text-lg hover:scale-110 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
 
-                <button className="btn-outline p-2">
-                    <Monitor size={16} />
-                </button>
+                    {/* === VIDEO GRID (always mounted) === */}
+                    <div
+                        className={`grid gap-2 place-items-center transition-all duration-300
+            ${fullScreen
+                                ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4 flex-1 bg-black"
+                                : "grid-cols-2 p-2"
+                            }`}
+                    >
+                        {/* Local */}
+                        <video
+                            ref={localRef}
+                            autoPlay
+                            muted
+                            playsInline
+                            className={`object-cover rounded-md border border-white/10
+              ${fullScreen ? "w-full h-40" : "w-24 h-16"}
+            `}
+                        />
+
+                        {/* Remotes */}
+                        {remoteStreams.map(r => (
+                            <video
+                                key={r.id}
+                                autoPlay
+                                playsInline
+                                className={`object-cover rounded-md border border-white/10
+                ${fullScreen ? "w-full h-40" : "w-24 h-16"}
+              `}
+                                ref={el => {
+                                    if (el) el.srcObject = r.stream;
+                                }}
+                            />
+                        ))}
+                    </div>
+
+                    {/* === BOTTOM CONTROLS === */}
+                    <div
+                        className={`flex justify-center gap-4 p-2 transition-all
+            ${fullScreen ? "bg-[#1a1a1a] border-t border-white/10" : ""}
+          `}
+                    >
+                        <button onClick={toggleMic} className="btn-outline p-2">
+                            {micOn ? <Mic size={16} /> : <MicOff size={16} />}
+                        </button>
+
+                        <button onClick={toggleCam} className="btn-outline p-2">
+                            {camOn ? <Video size={16} /> : <VideoOff size={16} />}
+                        </button>
+
+                        {/* === FULLSCREEN ICON === */}
+                        {!fullScreen && (
+                            <button
+                                onClick={() => setFullScreen(true)}
+                                className="btn-outline p-2"
+                            >
+                                <Monitor size={16} />
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
+
+
 }
