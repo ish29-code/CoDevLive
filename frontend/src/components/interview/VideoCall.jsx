@@ -29,7 +29,7 @@ export default function VideoCall({ roomId }) {
             socket.emit("join-room", roomId);
 
             // Receive existing users
-            /*socket.on("all-users", async (users) => {
+            /*socket.on("all-users", async (users) => 
                 for (const userId of users) {
                     const pc = createPeer(userId);
                     pcsRef.current[userId] = pc;
