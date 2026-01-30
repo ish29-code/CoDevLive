@@ -27,7 +27,6 @@ export default function VideoCall({ roomId }) {
             localRef.current.srcObject = stream;
 
             socket.emit("join-room", roomId);
-
             // Receive existing users
             /*socket.on("all-users", async (users) => 
                 for (const userId of users) {
