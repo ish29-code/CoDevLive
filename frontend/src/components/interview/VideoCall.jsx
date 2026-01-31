@@ -1,140 +1,148 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, Monitor } from "lucide-react";
+import {
+    Mic,
+    MicOff,
+    Video,
+    VideoOff,
+    Maximize2,
+    Minimize2
+} from "lucide-react";
+
+import { createPortal } from "react-dom";
 import { socket } from "../../utils/socket";
 
 const ICE = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 export default function VideoCall({ roomId }) {
-    const localRef = useRef();
-    const streamRef = useRef();
-    const pcsRef = useRef({}); // 🔥 multiple peer connections
+
+    const localRef = useRef(null);
+    const streamRef = useRef(null);
+    const pcsRef = useRef({});
 
     const [remoteStreams, setRemoteStreams] = useState([]);
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
-    const [fullScreen, setFullScreen] = useState(false);
+    const [fullScreen, setFullScreen] = useState(false); // ✅ LOCAL ONLY
 
-
-    // ---------- INIT ----------
+    // ---------------- INIT ----------------
     useEffect(() => {
         let mounted = true;
 
         const init = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            if (!mounted) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
 
-            streamRef.current = stream;
-            localRef.current.srcObject = stream;
+                if (!mounted) return;
 
-            socket.emit("join-room", roomId);
-            // Receive existing users
-            /*socket.on("all-users", async (users) => 
-                for (const userId of users) {
+                streamRef.current = stream;
+                if (localRef.current) localRef.current.srcObject = stream;
+
+                socket.emit("join-room", roomId);
+
+                socket.on("all-users", async (users) => {
+                    for (const userId of users) {
+                        const pc = createPeer(userId);
+                        pcsRef.current[userId] = pc;
+
+                        stream.getTracks().forEach(track =>
+                            pc.addTrack(track, stream)
+                        );
+
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+
+                        socket.emit("webrtc-offer", { to: userId, offer });
+                    }
+                });
+
+                socket.on("user-joined", async (userId) => {
                     const pc = createPeer(userId);
                     pcsRef.current[userId] = pc;
 
-                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                    stream.getTracks().forEach(track =>
+                        pc.addTrack(track, stream)
+                    );
 
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
+
                     socket.emit("webrtc-offer", { to: userId, offer });
-                }
-            });
+                });
 
-            // When new user joins later
-            socket.on("user-joined", async (userId) => {
-                const pc = createPeer(userId);
-                pcsRef.current[userId] = pc;
-                stream.getTracks().forEach(track => pc.addTrack(track, stream));
-            });*/
+                socket.on("webrtc-offer", async ({ from, offer }) => {
+                    const pc = createPeer(from);
+                    pcsRef.current[from] = pc;
 
-            // Receive existing users
-            socket.on("all-users", async (users) => {
-                for (const userId of users) {
-                    const pc = createPeer(userId);
-                    pcsRef.current[userId] = pc;
+                    stream.getTracks().forEach(track =>
+                        pc.addTrack(track, stream)
+                    );
 
-                    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                    await pc.setRemoteDescription(offer);
 
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
-                    socket.emit("webrtc-offer", { to: userId, offer });
-                }
-            });
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
 
-            // When new user joins later
-            socket.on("user-joined", async (userId) => {
-                const pc = createPeer(userId);
-                pcsRef.current[userId] = pc;
+                    socket.emit("webrtc-answer", { to: from, answer });
+                });
 
-                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                socket.on("webrtc-answer", async ({ from, answer }) => {
+                    await pcsRef.current[from]?.setRemoteDescription(answer);
+                });
 
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                socket.emit("webrtc-offer", { to: userId, offer });
-            });
+                socket.on("ice-candidate", ({ from, candidate }) => {
+                    pcsRef.current[from]?.addIceCandidate(candidate);
+                });
 
+                socket.on("user-left", (userId) => {
+                    pcsRef.current[userId]?.close();
+                    delete pcsRef.current[userId];
 
-            // Receive offer
-            socket.on("webrtc-offer", async ({ from, offer }) => {
-                const pc = createPeer(from);
-                pcsRef.current[from] = pc;
+                    setRemoteStreams(prev =>
+                        prev.filter(r => r.id !== userId)
+                    );
+                });
 
-                stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-                await pc.setRemoteDescription(offer);
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                socket.emit("webrtc-answer", { to: from, answer });
-            });
-
-            // Receive answer
-            socket.on("webrtc-answer", async ({ from, answer }) => {
-                await pcsRef.current[from].setRemoteDescription(answer);
-            });
-
-            // ICE
-            socket.on("ice-candidate", ({ from, candidate }) => {
-                pcsRef.current[from]?.addIceCandidate(candidate);
-            });
-
-            // User left
-            socket.on("user-left", (userId) => {
-                pcsRef.current[userId]?.close();
-                delete pcsRef.current[userId];
-                setRemoteStreams(prev => prev.filter(r => r.id !== userId));
-            });
+            } catch (err) {
+                console.error("Media error:", err);
+            }
         };
 
         init();
 
         return () => {
             mounted = false;
+
             socket.off("all-users");
             socket.off("user-joined");
             socket.off("webrtc-offer");
             socket.off("webrtc-answer");
             socket.off("ice-candidate");
             socket.off("user-left");
+
             Object.values(pcsRef.current).forEach(pc => pc.close());
             streamRef.current?.getTracks().forEach(t => t.stop());
         };
     }, [roomId]);
 
-    // ---------- CREATE PEER ----------
+    // ---------------- PEER ----------------
     function createPeer(userId) {
         const pc = new RTCPeerConnection(ICE);
 
         pc.onicecandidate = (e) => {
             if (e.candidate) {
-                socket.emit("ice-candidate", { to: userId, candidate: e.candidate });
+                socket.emit("ice-candidate", {
+                    to: userId,
+                    candidate: e.candidate
+                });
             }
         };
 
         pc.ontrack = (e) => {
             setRemoteStreams(prev => {
-                const exists = prev.find(p => p.id === userId);
-                if (exists) return prev;
+                if (prev.find(p => p.id === userId)) return prev;
                 return [...prev, { id: userId, stream: e.streams[0] }];
             });
         };
@@ -142,117 +150,147 @@ export default function VideoCall({ roomId }) {
         return pc;
     }
 
-    // ---------- CONTROLS ----------
+    // ---------------- CONTROLS ----------------
     const toggleMic = () => {
-        streamRef.current.getAudioTracks().forEach(t => t.enabled = !micOn);
-        setMicOn(!micOn);
+        if (!streamRef.current) return;
+
+        streamRef.current.getAudioTracks().forEach(t => {
+            t.enabled = !micOn;
+        });
+
+        setMicOn(prev => !prev);
     };
 
     const toggleCam = () => {
-        streamRef.current.getVideoTracks().forEach(t => t.enabled = !camOn);
-        setCamOn(!camOn);
+        if (!streamRef.current) return;
+
+        streamRef.current.getVideoTracks().forEach(t => {
+            t.enabled = !camOn;
+        });
+
+        setCamOn(prev => !prev);
     };
 
-    // ---------- UI ----------//
-    return (
-        <div className="relative">
+    // ---------------- NORMAL UI ----------------
+    const normalUI = (
+        <div className="w-full">
 
-            {/* === SMALL / NORMAL CONTAINER === */}
-            <div
-                className={`transition-all duration-300 ease-in-out
-        ${fullScreen
-                        ? "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
-                        : "w-full"
-                    }`}
-            >
-                {/* === POPUP CARD === */}
-                <div
-                    className={`transition-all duration-300 ease-in-out
-          ${fullScreen
-                            ? "w-[90vw] h-[80vh] bg-[#111] rounded-xl border border-white/10 shadow-xl flex flex-col"
-                            : ""
-                        }`}
-                >
+            <div className="grid grid-cols-2 gap-2 p-2">
 
-                    {/* === TOP BAR === */}
-                    {fullScreen && (
-                        <div className="flex justify-between items-center px-4 py-2 bg-[#1a1a1a] border-b border-white/10">
-                            <span className="text-sm font-semibold text-white">
-                                CoDevLive Interview
-                            </span>
+                <video
+                    ref={localRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-32 h-24 rounded border border-white/10 object-cover"
+                />
 
-                            <button
-                                onClick={() => setFullScreen(false)}
-                                className="text-white text-lg hover:scale-110 transition"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    )}
+                {remoteStreams.map(r => (
+                    <video
+                        key={r.id}
+                        autoPlay
+                        playsInline
+                        className="w-32 h-24 rounded border border-white/10 object-cover"
+                        ref={el => {
+                            if (el) el.srcObject = r.stream;
+                        }}
+                    />
+                ))}
 
-                    {/* === VIDEO GRID (always mounted) === */}
-                    <div
-                        className={`grid gap-2 place-items-center transition-all duration-300
-            ${fullScreen
-                                ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4 flex-1 bg-black"
-                                : "grid-cols-2 p-2"
-                            }`}
-                    >
-                        {/* Local */}
-                        <video
-                            ref={localRef}
-                            autoPlay
-                            muted
-                            playsInline
-                            className={`object-cover rounded-md border border-white/10
-              ${fullScreen ? "w-full h-40" : "w-24 h-16"}
-            `}
-                        />
-
-                        {/* Remotes */}
-                        {remoteStreams.map(r => (
-                            <video
-                                key={r.id}
-                                autoPlay
-                                playsInline
-                                className={`object-cover rounded-md border border-white/10
-                ${fullScreen ? "w-full h-40" : "w-24 h-16"}
-              `}
-                                ref={el => {
-                                    if (el) el.srcObject = r.stream;
-                                }}
-                            />
-                        ))}
-                    </div>
-
-                    {/* === BOTTOM CONTROLS === */}
-                    <div
-                        className={`flex justify-center gap-4 p-2 transition-all
-            ${fullScreen ? "bg-[#1a1a1a] border-t border-white/10" : ""}
-          `}
-                    >
-                        <button onClick={toggleMic} className="btn-outline p-2">
-                            {micOn ? <Mic size={16} /> : <MicOff size={16} />}
-                        </button>
-
-                        <button onClick={toggleCam} className="btn-outline p-2">
-                            {camOn ? <Video size={16} /> : <VideoOff size={16} />}
-                        </button>
-
-                        {/* === FULLSCREEN ICON === */}
-                        {!fullScreen && (
-                            <button
-                                onClick={() => setFullScreen(true)}
-                                className="btn-outline p-2"
-                            >
-                                <Monitor size={16} />
-                            </button>
-                        )}
-                    </div>
-                </div>
             </div>
+
+            <div className="flex justify-center gap-4 p-2">
+                <button onClick={toggleMic} className="btn-outline p-2">
+                    {micOn ? <Mic size={18} /> : <MicOff size={18} />}
+                </button>
+
+                <button onClick={toggleCam} className="btn-outline p-2">
+                    {camOn ? <Video size={18} /> : <VideoOff size={18} />}
+                </button>
+
+                <button
+                    onClick={() => setFullScreen(true)}
+                    className="btn-outline p-2"
+                >
+                    <Maximize2 size={18} />
+                </button>
+            </div>
+
         </div>
     );
 
+    // ---------------- FULLSCREEN UI ----------------
+    const fullScreenUI = (
+        <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
 
+            <div className="flex justify-between items-center px-6 py-3 bg-[#111] border-b border-white/10">
+                <span className="text-white font-semibold">
+                    CoDevLive Interview
+                </span>
+
+                <button
+                    onClick={() => setFullScreen(false)}
+                    className="text-white"
+                >
+                    <Minimize2 size={20} />
+                </button>
+            </div>
+
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
+
+                <video
+                    ref={localRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-44 rounded border border-white/10 object-cover"
+                />
+
+                {remoteStreams.map(r => (
+                    <video
+                        key={r.id}
+                        autoPlay
+                        playsInline
+                        className="w-full h-44 rounded border border-white/10 object-cover"
+                        ref={el => {
+                            if (el) el.srcObject = r.stream;
+                        }}
+                    />
+                ))}
+
+            </div>
+
+            <div className="flex justify-center gap-6 p-4 bg-[#111] border-t border-white/10">
+                <button onClick={toggleMic} className="btn-outline p-3">
+                    {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+                </button>
+
+                <button onClick={toggleCam} className="btn-outline p-3">
+                    {camOn ? <Video size={20} /> : <VideoOff size={20} />}
+                </button>
+
+                <button
+                    onClick={() => setFullScreen(false)}
+                    className="btn-outline p-3"
+                >
+                    <Minimize2 size={20} />
+                </button>
+            </div>
+
+        </div>
+    );
+
+    // ---------------- RETURN ----------------
+    return (
+        <>
+            {!fullScreen && normalUI}
+
+            {fullScreen &&
+                createPortal(
+                    fullScreenUI,
+                    document.body
+                )
+            }
+        </>
+    );
 }
