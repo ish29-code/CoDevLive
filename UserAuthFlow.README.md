@@ -1,5 +1,5 @@
 
-🔐 User Authentication Flow — CoDevLive
+🔐 User Authentication Flow — CoDevLive -
 
 This document explains the complete user authentication system implemented in CoDevLive.
 It includes Local JWT Authentication and Firebase Social Authentication, along with password reset, session persistence, and route protection.

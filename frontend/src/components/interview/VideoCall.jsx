@@ -281,16 +281,93 @@ export default function VideoCall({ roomId }) {
     );
 
     // ---------------- RETURN ----------------
-    return (
-        <>
-            {!fullScreen && normalUI}
+    return createPortal(
 
-            {fullScreen &&
-                createPortal(
-                    fullScreenUI,
-                    document.body
-                )
+        <div className={`
+        ${fullScreen
+                ? "fixed inset-0 z-[9999] bg-black flex flex-col"
+                : "w-full"
             }
-        </>
+    `}>
+
+            {/* TOP BAR only if fullscreen */}
+            {fullScreen && (
+                <div className="flex justify-between items-center px-6 py-3 bg-[#111] border-b border-white/10">
+                    <span className="text-white font-semibold">
+                        CoDevLive Interview
+                    </span>
+
+                    <button
+                        onClick={() => setFullScreen(false)}
+                        className="text-white"
+                    >
+                        <Minimize2 size={20} />
+                    </button>
+                </div>
+            )}
+
+            {/* VIDEO GRID — ALWAYS SAME ELEMENTS */}
+            <div className={`
+            grid gap-3
+            ${fullScreen
+                    ? "flex-1 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4"
+                    : "grid-cols-2 p-2"
+                }
+        `}>
+
+                <video
+                    ref={localRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className={`
+                    object-cover rounded border border-white/10
+                    ${fullScreen ? "w-full h-44" : "w-32 h-24"}
+                `}
+                />
+
+                {remoteStreams.map(r => (
+                    <video
+                        key={r.id}
+                        autoPlay
+                        playsInline
+                        className={`
+                        object-cover rounded border border-white/10
+                        ${fullScreen ? "w-full h-44" : "w-32 h-24"}
+                    `}
+                        ref={el => {
+                            if (el) el.srcObject = r.stream;
+                        }}
+                    />
+                ))}
+
+            </div>
+
+            {/* CONTROLS */}
+            <div className="flex justify-center gap-4 p-3 bg-[#111] border-t border-white/10">
+
+                <button onClick={toggleMic} className="btn-outline p-2">
+                    {micOn ? <Mic size={20} /> : <MicOff size={20} />}
+                </button>
+
+                <button onClick={toggleCam} className="btn-outline p-2">
+                    {camOn ? <Video size={20} /> : <VideoOff size={20} />}
+                </button>
+
+                <button
+                    onClick={() => setFullScreen(prev => !prev)}
+                    className="btn-outline p-2"
+                >
+                    {fullScreen
+                        ? <Minimize2 size={20} />
+                        : <Maximize2 size={20} />
+                    }
+                </button>
+
+            </div>
+
+        </div>,
+        document.body
     );
+
 }
