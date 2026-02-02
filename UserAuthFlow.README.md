@@ -15,7 +15,7 @@ Firebase Authentication (Google / GitHub / Email)
 
 Axios / Fetch
 
-LocalStorage for session persistence
+LocalStorage for session persistence...
 
 Backend
 
