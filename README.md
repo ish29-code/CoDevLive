@@ -272,68 +272,107 @@ Peer-to-peer = scalable.
 
 ---
 
-## Installation
+
+### 1️⃣ Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/codevlive.git
 cd codevlive
-Install Dependencies
-```bash
+```
 
-Copy code
+---
+
+## 📦 Install Dependencies
+
+Install packages for backend, frontend, and workers:
+
+```bash
 npm install --prefix backend
 npm install --prefix frontend
 npm install --prefix workers
-Environment Variables
-Create .env inside backend:
+```
 
-env
-Copy code
+---
+
+## 🔐 Environment Variables
+
+Create a `.env` file inside the **backend** folder:
+
+```env
 PORT=5000
-MONGO_URI=your_uri
-JWT_SECRET=your_secret
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_super_secret_key
 
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 
 EMAIL_USER=your_email
-EMAIL_PASS=your_password
-Run Redis
-bash
-Copy code
-redis-server
-Verify:
+EMAIL_PASS=your_email_password
+```
 
-nginx
-Copy code
+---
+
+## ⚡ Run Redis
+
+Start the Redis server:
+
+```bash
+redis-server
+```
+
+Verify Redis is running:
+
+```bash
+redis-cli ping
+```
+
+Expected output:
+
+```
 PONG
-Start Services
-Backend
-arduino
-Copy code
+```
+
+---
+
+## ▶️ Start the Application
+
+### Start Backend
+```bash
+cd backend
 npm run dev
-Worker
-arduino
-Copy code
+```
+
+---
+
+### Start Worker (Queue Processor)
+```bash
 cd workers
 npm run dev
-Frontend
-powershell
-Copy code
+```
+
+---
+
+### Start Frontend
+```bash
+cd frontend
 npm start
-🔮 Future Enhancements
-Kubernetes deployment
+```
 
-Auto-scaling socket clusters
+Your app should now be running 🚀
 
-Code execution sandbox (Docker)
+---
 
-Interview recording
+# 🔮 Future Enhancements
 
-AI-based candidate evaluation
+- Kubernetes deployment for container orchestration  
+- Auto-scaling WebSocket clusters  
+- Secure code execution sandbox using Docker  
+- Interview session recording  
+- AI-powered candidate evaluation  
 
-👩‍💻 Author
-Ishika Deshpande
+---
 
-Backend-focused Full Stack Engineer passionate about distributed systems and real-time architecture.
+# 👩‍💻 Author
 
+**Ishika Deshpande**  
+Backend-focused Full Stack Engineer passionate about distributed systems, real-time architecture, and scalable backend design.
