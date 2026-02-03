@@ -16,8 +16,12 @@ const redisUrl = process.env.REDIS_URL;
 
 /* ✅ EXPORT HERE */
 export const pubClient = createClient({
-    url: redisUrl,
+    url: process.env.REDIS_URL,
+    socket: {
+        reconnectStrategy: retries => Math.min(retries * 50, 500)
+    }
 });
+
 
 export const subClient = pubClient.duplicate();
 
