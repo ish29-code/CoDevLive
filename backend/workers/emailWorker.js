@@ -3,7 +3,10 @@ dotenv.config();
 
 import { Worker } from "bullmq";
 import { sendEmail } from "../Utils/sendEmail.js";
-import { redisConnection } from "../config/redis.js";
+export const redisConnection = {
+    url: process.env.REDIS_URL,
+};
+
 
 console.log("📨 Email Worker started...");
 
