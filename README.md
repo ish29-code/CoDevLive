@@ -276,7 +276,7 @@ Peer-to-peer = scalable.
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/codevlive.git
+git clone https://github.com/ish29-code/codevlive.git
 cd codevlive
 ```
 
