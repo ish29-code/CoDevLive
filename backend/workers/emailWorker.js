@@ -24,6 +24,7 @@ const emailWorker = new Worker(
     }
 );
 
+
 emailWorker.on("failed", (job, err) => {
     console.error("❌ Email job failed:", err.message);
 });
