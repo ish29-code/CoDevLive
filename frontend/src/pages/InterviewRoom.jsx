@@ -6,7 +6,7 @@ import Editor from "@monaco-editor/react";
 import VideoCall from "../components/interview/VideoCall";
 import Loader from "../components/Loader";
 import { problems } from "../data/problems";
-import api from "../utils/axios"; // 👈 ADD THIS IMPORT
+import api from "../utils/axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
