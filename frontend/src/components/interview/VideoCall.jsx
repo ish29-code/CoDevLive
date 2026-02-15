@@ -1,137 +1,165 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import {
     Mic,
     MicOff,
     Video,
     VideoOff,
+    Monitor,
+    MonitorOff,
     Maximize2,
     Minimize2
 } from "lucide-react";
 
-import { createPortal } from "react-dom";
 import { socket } from "../../utils/socket";
+import { useTheme } from "../../context/ThemeContext";
 
-const ICE = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+const ICE = {
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+};
+
+//////////////////////////////////////////////////////////
+// ✅ MEMO VIDEO TILE — prevents re-render flicker
+//////////////////////////////////////////////////////////
+
+const VideoTile = memo(({ stream, muted }) => {
+
+    const ref = useRef();
+
+    useEffect(() => {
+        if (ref.current && stream) {
+            ref.current.srcObject = stream;
+        }
+    }, [stream]);
+
+    return (
+        <video
+            ref={ref}
+            autoPlay
+            muted={muted}
+            playsInline
+            className="w-full aspect-video object-cover rounded-lg bg-black"
+        />
+    );
+});
+
+//////////////////////////////////////////////////////////
 
 export default function VideoCall({ roomId }) {
 
-    const localRef = useRef(null);
+    const { theme } = useTheme();
+
     const streamRef = useRef(null);
     const pcsRef = useRef({});
+    const screenTrackRef = useRef(null);
 
     const [remoteStreams, setRemoteStreams] = useState([]);
+    const [expanded, setExpanded] = useState(false);
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
-    const [fullScreen, setFullScreen] = useState(false); // ✅ LOCAL ONLY
+    const [presenting, setPresenting] = useState(false);
 
-    // ---------------- INIT ----------------
+    //////////////////////////////////////////////////////////
+    // INIT
+    //////////////////////////////////////////////////////////
+
     useEffect(() => {
+
         let mounted = true;
 
         const init = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
 
-                if (!mounted) return;
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
 
-                streamRef.current = stream;
-                if (localRef.current) localRef.current.srcObject = stream;
+            if (!mounted) return;
 
-                socket.emit("join-room", roomId);
+            streamRef.current = stream;
 
-                socket.on("all-users", async (users) => {
-                    for (const userId of users) {
-                        const pc = createPeer(userId);
-                        pcsRef.current[userId] = pc;
+            socket.emit("join-room", roomId);
 
-                        stream.getTracks().forEach(track =>
-                            pc.addTrack(track, stream)
-                        );
+            socket.on("all-users", users => users.forEach(createConnection));
+            socket.on("user-joined", createConnection);
 
-                        const offer = await pc.createOffer();
-                        await pc.setLocalDescription(offer);
+            socket.on("webrtc-offer", async ({ from, offer }) => {
 
-                        socket.emit("webrtc-offer", { to: userId, offer });
-                    }
-                });
+                const pc = createPeer(from);
+                pcsRef.current[from] = pc;
 
-                socket.on("user-joined", async (userId) => {
-                    const pc = createPeer(userId);
-                    pcsRef.current[userId] = pc;
+                stream.getTracks().forEach(track =>
+                    pc.addTrack(track, stream)
+                );
 
-                    stream.getTracks().forEach(track =>
-                        pc.addTrack(track, stream)
-                    );
+                await pc.setRemoteDescription(offer);
 
-                    const offer = await pc.createOffer();
-                    await pc.setLocalDescription(offer);
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
 
-                    socket.emit("webrtc-offer", { to: userId, offer });
-                });
+                socket.emit("webrtc-answer", { to: from, answer });
+            });
 
-                socket.on("webrtc-offer", async ({ from, offer }) => {
-                    const pc = createPeer(from);
-                    pcsRef.current[from] = pc;
+            socket.on("webrtc-answer", ({ from, answer }) => {
+                pcsRef.current[from]?.setRemoteDescription(answer);
+            });
 
-                    stream.getTracks().forEach(track =>
-                        pc.addTrack(track, stream)
-                    );
+            socket.on("ice-candidate", ({ from, candidate }) => {
+                pcsRef.current[from]?.addIceCandidate(candidate);
+            });
 
-                    await pc.setRemoteDescription(offer);
+            socket.on("user-left", id => {
 
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
+                pcsRef.current[id]?.close();
+                delete pcsRef.current[id];
 
-                    socket.emit("webrtc-answer", { to: from, answer });
-                });
-
-                socket.on("webrtc-answer", async ({ from, answer }) => {
-                    await pcsRef.current[from]?.setRemoteDescription(answer);
-                });
-
-                socket.on("ice-candidate", ({ from, candidate }) => {
-                    pcsRef.current[from]?.addIceCandidate(candidate);
-                });
-
-                socket.on("user-left", (userId) => {
-                    pcsRef.current[userId]?.close();
-                    delete pcsRef.current[userId];
-
-                    setRemoteStreams(prev =>
-                        prev.filter(r => r.id !== userId)
-                    );
-                });
-
-            } catch (err) {
-                console.error("Media error:", err);
-            }
+                setRemoteStreams(prev =>
+                    prev.filter(r => r.id !== id)
+                );
+            });
         };
 
         init();
 
         return () => {
             mounted = false;
-
-            socket.off("all-users");
-            socket.off("user-joined");
-            socket.off("webrtc-offer");
-            socket.off("webrtc-answer");
-            socket.off("ice-candidate");
-            socket.off("user-left");
+            socket.removeAllListeners();
 
             Object.values(pcsRef.current).forEach(pc => pc.close());
             streamRef.current?.getTracks().forEach(t => t.stop());
         };
+
     }, [roomId]);
 
-    // ---------------- PEER ----------------
+    //////////////////////////////////////////////////////////
+    // CONNECTION
+    //////////////////////////////////////////////////////////
+
+    function createConnection(userId) {
+
+        if (pcsRef.current[userId]) return;
+
+        const pc = createPeer(userId);
+        pcsRef.current[userId] = pc;
+
+        streamRef.current.getTracks().forEach(track =>
+            pc.addTrack(track, streamRef.current)
+        );
+
+        pc.createOffer()
+            .then(o => pc.setLocalDescription(o))
+            .then(() => {
+                socket.emit("webrtc-offer", {
+                    to: userId,
+                    offer: pc.localDescription
+                });
+            });
+    }
+
     function createPeer(userId) {
+
         const pc = new RTCPeerConnection(ICE);
 
-        pc.onicecandidate = (e) => {
+        pc.onicecandidate = e => {
             if (e.candidate) {
                 socket.emit("ice-candidate", {
                     to: userId,
@@ -140,234 +168,210 @@ export default function VideoCall({ roomId }) {
             }
         };
 
-        pc.ontrack = (e) => {
+        pc.ontrack = e => {
             setRemoteStreams(prev => {
-                if (prev.find(p => p.id === userId)) return prev;
-                return [...prev, { id: userId, stream: e.streams[0] }];
+
+                if (prev.some(p => p.id === userId))
+                    return prev;
+
+                return [...prev, {
+                    id: userId,
+                    stream: e.streams[0]
+                }];
             });
         };
 
         return pc;
     }
 
-    // ---------------- CONTROLS ----------------
+    //////////////////////////////////////////////////////////
+    // CONTROLS
+    //////////////////////////////////////////////////////////
+
     const toggleMic = () => {
-        if (!streamRef.current) return;
+        streamRef.current?.getAudioTracks()
+            .forEach(t => t.enabled = !micOn);
 
-        streamRef.current.getAudioTracks().forEach(t => {
-            t.enabled = !micOn;
-        });
-
-        setMicOn(prev => !prev);
+        setMicOn(!micOn);
     };
 
     const toggleCam = () => {
-        if (!streamRef.current) return;
+        streamRef.current?.getVideoTracks()
+            .forEach(t => t.enabled = !camOn);
 
-        streamRef.current.getVideoTracks().forEach(t => {
-            t.enabled = !camOn;
-        });
-
-        setCamOn(prev => !prev);
+        setCamOn(!camOn);
     };
 
-    // ---------------- NORMAL UI ----------------
-    const normalUI = (
-        <div className="w-full">
+    //////////////////////////////////////////////////////////
+    // ⭐ PRESENT (SCREEN SHARE)
+    //////////////////////////////////////////////////////////
 
-            <div className="grid grid-cols-2 gap-2 p-2">
+    const togglePresent = async () => {
 
-                <video
-                    ref={localRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-32 h-24 rounded border border-white/10 object-cover"
+        // STOP PRESENTING
+        if (presenting) {
+
+            const camTrack =
+                streamRef.current.getVideoTracks()[0];
+
+            Object.values(pcsRef.current).forEach(pc => {
+                const sender = pc.getSenders()
+                    .find(s => s.track.kind === "video");
+
+                sender.replaceTrack(camTrack);
+            });
+
+            screenTrackRef.current?.stop();
+            setPresenting(false);
+            return;
+        }
+
+        // START PRESENTING
+        const screen =
+            await navigator.mediaDevices.getDisplayMedia({
+                video: true
+            });
+
+        const track = screen.getVideoTracks()[0];
+        screenTrackRef.current = track;
+
+        Object.values(pcsRef.current).forEach(pc => {
+            const sender = pc.getSenders()
+                .find(s => s.track.kind === "video");
+
+            sender.replaceTrack(track);
+        });
+
+        track.onended = togglePresent;
+
+        setPresenting(true);
+    };
+
+    //////////////////////////////////////////////////////////
+    // GRID
+    //////////////////////////////////////////////////////////
+
+    const participants = [
+        { id: "local", stream: streamRef.current, muted: true },
+        ...remoteStreams
+    ];
+
+    const columns =
+        Math.ceil(Math.sqrt(participants.length));
+
+    const bg =
+        theme === "dark" ? "bg-black" : "bg-white";
+
+    //////////////////////////////////////////////////////////
+    // GRID COMPONENT (NOT recreated)
+    //////////////////////////////////////////////////////////
+
+    const grid = (
+        <div
+            className="grid gap-2 p-3 flex-1"
+            style={{
+                gridTemplateColumns:
+                    `repeat(${columns}, 1fr)`
+            }}
+        >
+            {participants.map(p => (
+                <VideoTile
+                    key={p.id}
+                    stream={p.stream}
+                    muted={p.muted}
                 />
-
-                {remoteStreams.map(r => (
-                    <video
-                        key={r.id}
-                        autoPlay
-                        playsInline
-                        className="w-32 h-24 rounded border border-white/10 object-cover"
-                        ref={el => {
-                            if (el) el.srcObject = r.stream;
-                        }}
-                    />
-                ))}
-
-            </div>
-
-            <div className="flex justify-center gap-4 p-2">
-                <button onClick={toggleMic} className="btn-outline p-2">
-                    {micOn ? <Mic size={18} /> : <MicOff size={18} />}
-                </button>
-
-                <button onClick={toggleCam} className="btn-outline p-2">
-                    {camOn ? <Video size={18} /> : <VideoOff size={18} />}
-                </button>
-
-                <button
-                    onClick={() => setFullScreen(true)}
-                    className="btn-outline p-2"
-                >
-                    <Maximize2 size={18} />
-                </button>
-            </div>
-
+            ))}
         </div>
     );
 
-    // ---------------- FULLSCREEN UI ----------------
-    const fullScreenUI = (
-        <div className="fixed inset-0 z-[9999] bg-black flex flex-col">
+    //////////////////////////////////////////////////////////
+    // UI
+    //////////////////////////////////////////////////////////
 
-            <div className="flex justify-between items-center px-6 py-3 bg-[#111] border-b border-white/10">
-                <span className="text-white font-semibold">
-                    CoDevLive Interview
-                </span>
+    return (
+        <>
+            {/* NORMAL */}
+            <div className={`rounded-xl border overflow-hidden ${bg}`}>
+                {grid}
 
-                <button
-                    onClick={() => setFullScreen(false)}
-                    className="text-white"
-                >
-                    <Minimize2 size={20} />
-                </button>
-            </div>
-
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
-
-                <video
-                    ref={localRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="w-full h-44 rounded border border-white/10 object-cover"
+                <Controls
+                    {...{
+                        micOn,
+                        camOn,
+                        presenting,
+                        toggleMic,
+                        toggleCam,
+                        togglePresent,
+                        expand: () => setExpanded(true)
+                    }}
                 />
+            </div>
 
-                {remoteStreams.map(r => (
-                    <video
-                        key={r.id}
-                        autoPlay
-                        playsInline
-                        className="w-full h-44 rounded border border-white/10 object-cover"
-                        ref={el => {
-                            if (el) el.srcObject = r.stream;
-                        }}
+            {/* EXPANDED */}
+            {expanded && (
+
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+
+                    {/* BLUR */}
+                    <div
+                        className="absolute inset-0 backdrop-blur-xl bg-black/40"
+                        onClick={() => setExpanded(false)}
                     />
-                ))}
 
-            </div>
+                    <div className={`relative w-[70%] h-[80%] rounded-2xl shadow-2xl flex flex-col ${bg}`}>
+                        {grid}
 
-            <div className="flex justify-center gap-6 p-4 bg-[#111] border-t border-white/10">
-                <button onClick={toggleMic} className="btn-outline p-3">
-                    {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-                </button>
-
-                <button onClick={toggleCam} className="btn-outline p-3">
-                    {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-                </button>
-
-                <button
-                    onClick={() => setFullScreen(false)}
-                    className="btn-outline p-3"
-                >
-                    <Minimize2 size={20} />
-                </button>
-            </div>
-
-        </div>
-    );
-
-    // ---------------- RETURN ----------------
-    return createPortal(
-
-        <div className={`
-        ${fullScreen
-                ? "fixed inset-0 z-[9999] bg-black flex flex-col"
-                : "w-full"
-            }
-    `}>
-
-            {/* TOP BAR only if fullscreen */}
-            {fullScreen && (
-                <div className="flex justify-between items-center px-6 py-3 bg-[#111] border-b border-white/10">
-                    <span className="text-white font-semibold">
-                        CoDevLive Interview
-                    </span>
-
-                    <button
-                        onClick={() => setFullScreen(false)}
-                        className="text-white"
-                    >
-                        <Minimize2 size={20} />
-                    </button>
+                        <Controls
+                            {...{
+                                micOn,
+                                camOn,
+                                presenting,
+                                toggleMic,
+                                toggleCam,
+                                togglePresent,
+                                expand: () => setExpanded(false),
+                                expanded: true
+                            }}
+                        />
+                    </div>
                 </div>
             )}
-
-            {/* VIDEO GRID — ALWAYS SAME ELEMENTS */}
-            <div className={`
-            grid gap-3
-            ${fullScreen
-                    ? "flex-1 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 p-4"
-                    : "grid-cols-2 p-2"
-                }
-        `}>
-
-                <video
-                    ref={localRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className={`
-                    object-cover rounded border border-white/10
-                    ${fullScreen ? "w-full h-44" : "w-32 h-24"}
-                `}
-                />
-
-                {remoteStreams.map(r => (
-                    <video
-                        key={r.id}
-                        autoPlay
-                        playsInline
-                        className={`
-                        object-cover rounded border border-white/10
-                        ${fullScreen ? "w-full h-44" : "w-32 h-24"}
-                    `}
-                        ref={el => {
-                            if (el) el.srcObject = r.stream;
-                        }}
-                    />
-                ))}
-
-            </div>
-
-            {/* CONTROLS */}
-            <div className="flex justify-center gap-4 p-3 bg-[#111] border-t border-white/10">
-
-                <button onClick={toggleMic} className="btn-outline p-2">
-                    {micOn ? <Mic size={20} /> : <MicOff size={20} />}
-                </button>
-
-                <button onClick={toggleCam} className="btn-outline p-2">
-                    {camOn ? <Video size={20} /> : <VideoOff size={20} />}
-                </button>
-
-                <button
-                    onClick={() => setFullScreen(prev => !prev)}
-                    className="btn-outline p-2"
-                >
-                    {fullScreen
-                        ? <Minimize2 size={20} />
-                        : <Maximize2 size={20} />
-                    }
-                </button>
-
-            </div>
-
-        </div>,
-        document.body
+        </>
     );
-
 }
+
+//////////////////////////////////////////////////////////
+// CONTROLS (memo-level performance)
+//////////////////////////////////////////////////////////
+
+const Controls = memo(({
+    micOn,
+    camOn,
+    presenting,
+    toggleMic,
+    toggleCam,
+    togglePresent,
+    expand,
+    expanded
+}) => (
+
+    <div className="flex justify-center gap-4 py-4 border-t">
+
+        <button onClick={toggleMic} className="btn-outline p-2">
+            {micOn ? <Mic /> : <MicOff />}
+        </button>
+
+        <button onClick={toggleCam} className="btn-outline p-2">
+            {camOn ? <Video /> : <VideoOff />}
+        </button>
+
+        <button onClick={togglePresent} className="btn-outline p-2">
+            {presenting ? <MonitorOff /> : <Monitor />}
+        </button>
+
+        <button onClick={expand} className="btn-outline p-2">
+            {expanded ? <Minimize2 /> : <Maximize2 />}
+        </button>
+
+    </div>
+));
