@@ -10,6 +10,7 @@ import { setupSocket } from "./socket.js";
 /* 🔥 Redis Adapter */
 import { createAdapter } from "@socket.io/redis-adapter";
 import { pubClient, subClient } from "./config/socketRedis.js";
+import { subscribeExecution } from "./subscribers/executionSubscriber.js";
 /* ================= ENV ================= */
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,7 @@ const io = setupSocket(server);
 io.adapter(createAdapter(pubClient, subClient));
 
 /* 🔥 Inject io into express so controllers get req.io */
+subscribeExecution(io);
 setIO(io);
 
 /* ================= START ================= */

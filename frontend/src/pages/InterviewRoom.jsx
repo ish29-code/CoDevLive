@@ -155,6 +155,28 @@ export default function InterviewRoom() {
             );
         }
 
+        // ---- EXECUTION STATUS ----
+        const onExecutionStatus = (data) => {
+            setStatus(data.status);
+        };
+
+        // ---- EXECUTION RESULT ----
+        const onExecutionResult = (data) => {
+            setRunLoading(false);
+
+            if (data.success) {
+                setStatus("Accepted");
+            } else {
+                setStatus("Runtime Error");
+            }
+
+            setOutput(data.output);
+
+            if (isInterviewer) {
+                logEvent("Code executed");
+            }
+        };
+
 
 
         // ---- SOCKET LISTENERS ----
@@ -164,6 +186,8 @@ export default function InterviewRoom() {
         socket.on("join-request", onJoinRequest);
         socket.on("participant-approved", onParticipantApproved);
         socket.on("participant-rejected", onParticipantRejected);
+        socket.on("execution-status", onExecutionStatus);
+        socket.on("execution-result", onExecutionResult);
 
         // ---- CLEANUP ----
         return () => {
@@ -173,6 +197,8 @@ export default function InterviewRoom() {
             socket.off("join-request", onJoinRequest);
             socket.off("participant-approved", onParticipantApproved);
             socket.off("participant-rejected", onParticipantRejected);
+            socket.off("execution-status", onExecutionStatus);
+            socket.off("execution-result", onExecutionResult);
         };
     }, [roomId, isCreator, navigate, user]
     );
@@ -229,7 +255,7 @@ export default function InterviewRoom() {
         setEvents(e => [...e.slice(-15), { time: formatTime(), label }]);
 
     /* ================= RUN CODE ================= */
-    const runCode = () => {
+    /*const runCode = () => {
         setRunLoading(true);
         setStatus("");
         setOutput("");
@@ -247,6 +273,20 @@ export default function InterviewRoom() {
                 setRunLoading(false);
             }
         }, 800);
+    };*/
+
+    const runCode = () => {
+        if (!code) return;
+
+        setRunLoading(true);
+        setStatus("Queued");
+        setOutput("");
+
+        socket.emit("run-code", {
+            roomId,
+            code,
+            language,
+        });
     };
 
     /* ================= INTERVIEWER: SELECT PROBLEM ================= */

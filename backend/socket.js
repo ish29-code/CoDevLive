@@ -52,6 +52,8 @@ export const getIO = () => io;*/
 
 // backend/socket.js
 import { Server } from "socket.io";
+import { queueRedis } from "./config/queueRedis";
+
 
 let io;
 const rooms = {}; // roomId => [socketIds]
@@ -105,6 +107,20 @@ export const setupSocket = (server) => {
                 rooms[roomId] = rooms[roomId].filter(id => id !== socket.id);
                 socket.to(roomId).emit("user-left", socket.id);
             }
+        });
+        socket.on("run-code", async ({ roomId, code, language }) => {
+
+            const job = {
+                roomId,
+                code,
+                language,
+            };
+
+            await queueRedis.lpush("codeExecutionQueue", JSON.stringify(job));
+
+            io.to(roomId).emit("execution-status", {
+                status: "Queued"
+            });
         });
     });
 
