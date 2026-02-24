@@ -52,7 +52,7 @@ export const getIO = () => io;*/
 
 // backend/socket.js
 import { Server } from "socket.io";
-import { queueRedis } from "./config/queueRedis";
+import { queueRedis } from "./config/queueRedis.js";
 
 
 let io;
