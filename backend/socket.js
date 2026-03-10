@@ -53,7 +53,9 @@ export const getIO = () => io;*/
 
 // backend/socket.js
 import { Server } from "socket.io";
-import { queueRedis } from "./config/queueRedis.js";
+import { codeExecutionQueue } from "./queues/codeExecutionQueue.js";
+
+
 
 
 let io;
@@ -114,14 +116,15 @@ export const setupSocket = (server) => {
             const job = {
                 roomId,
                 code,
-                language,
+                language
             };
 
-            await queueRedis.lpush("codeExecutionQueue", JSON.stringify(job));
+            await codeExecutionQueue.add("runCode", job);
 
             io.to(roomId).emit("execution-status", {
                 status: "Queued"
             });
+
         });
     });
 

@@ -1,47 +1,43 @@
-User writes code in editor
+User clicks Submit
         ↓
-Clicks RUN
+submissionController
         ↓
-Frontend sends request via WebSocket
+Submission saved (Pending)
         ↓
-Backend receives code + language + socketId
+BullMQ Queue
         ↓
-Backend pushes job to Redis queue (BullMQ)
+Worker picks job
         ↓
-Judge Worker listens to queue
+status = Running
         ↓
-Worker spins Docker container
+Docker executes code
         ↓
-Code compiled & executed in sandbox
+Run testcases
         ↓
-Worker publishes result to Redis Pub/Sub
+Verdict generated
         ↓
-Backend receives result
+Submission updated
         ↓
-Backend sends result via WebSocket
-        ↓
-Frontend updates UI (Queued → Running → Completed)
+Progress updated (if Accepted)
 
 
 
 right now
-Client
-  ↓
-Backend (API + WebSocket + Queue producer)
-  ↓
-Redis Queue
-  ↓
-Worker Service
-  ↓
-Docker Execution
-  ↓
-Redis Pub/Sub
-  ↓
-Backend
-  ↓
-WebSocket
-  ↓
-Client
+socket run-code
+      ↓
+BullMQ queue
+      ↓
+worker
+      ↓
+dockerExecutor
+      ↓
+publish executionResults
+      ↓
+subscriber
+      ↓
+socket emit
+      ↓
+frontend output
 
 
 

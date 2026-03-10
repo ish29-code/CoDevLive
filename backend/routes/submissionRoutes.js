@@ -1,9 +1,10 @@
 import express from "express";
 import { protect } from "../middlewares/authMiddleware.js";
-import { submitSolution } from "../controllers/submissionController.js";
+import { submitCode } from "../controllers/submissionController.js";
 
 const router = express.Router();
 
-router.post("/", protect, submitSolution);
+// POST /api/submissions
+router.post("/", protect, submitCode);
 
 export default router;

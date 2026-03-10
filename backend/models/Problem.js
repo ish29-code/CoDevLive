@@ -1,112 +1,128 @@
-// models/Problem.js
 import mongoose from "mongoose";
+
+/* ================= TEST CASE SCHEMA ================= */
 
 const testCaseSchema = new mongoose.Schema(
     {
         input: {
-            type: String, // raw input string (judge-ready)
-            required: true,
+            type: String,
+            required: true
         },
+
         output: {
-            type: String, // expected output
-            required: true,
-        },
+            type: String,
+            required: true
+        }
     },
     { _id: false }
 );
 
+/* ================= PROBLEM SCHEMA ================= */
+
 const problemSchema = new mongoose.Schema(
     {
-        /* ================= BASIC INFO ================= */
+        /* ===== BASIC INFO ===== */
+
         title: {
             type: String,
-            required: true,
-            index: true,
+            required: true
         },
 
         slug: {
-            type: String, // e.g. "two-sum"
+            type: String,
             required: true,
-            unique: true,
+            unique: true
         },
 
         difficulty: {
             type: String,
             enum: ["Easy", "Medium", "Hard"],
-            required: true,
-            index: true,
+            required: true
         },
 
         pattern: {
-            type: String, // Arrays, DP, Graphs, etc.
-            required: true,
-            index: true,
+            type: String, // e.g. Two Pointer, Sliding Window, Graph
+            required: true
         },
 
-        /* ================= CONTENT ================= */
+        /* ===== CONTENT ===== */
+
         description: {
-            type: String, // HTML / Markdown supported
-            required: true,
+            type: String,
+            required: true
         },
 
         constraints: {
-            type: String,
+            type: String
         },
 
         examples: [
             {
                 input: String,
                 output: String,
-                explanation: String,
-            },
+                explanation: String
+            }
         ],
 
-        /* ================= JUDGE ================= */
+        /* ===== JUDGE SYSTEM ===== */
+
         testCases: {
             type: [testCaseSchema],
-            required: true,
+            required: true
         },
 
         timeLimit: {
-            type: Number, // in ms
-            default: 2000,
+            type: Number, // milliseconds
+            default: 2000
         },
 
         memoryLimit: {
-            type: Number, // in MB
-            default: 256,
+            type: Number, // MB
+            default: 256
         },
 
-        /* ================= METADATA ================= */
-        tags: {
-            type: [String], // ["array", "hashmap"]
-            index: true,
-        },
+        /* ===== METADATA ===== */
 
-        companies: {
-            type: [String], // Amazon, Google, etc.
-            index: true,
-        },
+        tags: [
+            String // ["array", "two-pointer", "hashmap"]
+        ],
 
-        /* ================= STATS ================= */
+        companies: [
+            String // ["Amazon", "Google", "Microsoft"]
+        ],
+
+        /* ===== STATS ===== */
+
         stats: {
-            totalSubmissions: { type: Number, default: 0 },
-            acceptedSubmissions: { type: Number, default: 0 },
+            totalSubmissions: {
+                type: Number,
+                default: 0
+            },
+
+            acceptedSubmissions: {
+                type: Number,
+                default: 0
+            }
         },
 
-        /* ================= STATUS ================= */
+        /* ===== STATUS ===== */
+
         isPublished: {
             type: Boolean,
-            default: true,
-        },
+            default: true
+        }
     },
+
     { timestamps: true }
 );
 
-/* ================= INDEXES FOR SCALE ================= */
+/* ================= INDEXES FOR PERFORMANCE ================= */
+
+problemSchema.index({ slug: 1 });
+problemSchema.index({ difficulty: 1 });
+problemSchema.index({ pattern: 1 });
 problemSchema.index({ pattern: 1, difficulty: 1 });
 problemSchema.index({ tags: 1 });
 problemSchema.index({ companies: 1 });
 
 export default mongoose.model("Problem", problemSchema);
-

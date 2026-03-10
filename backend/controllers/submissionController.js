@@ -1,45 +1,59 @@
-// controllers/submissionController.js
-import Submission from "../models/Submission.js";
+import Submission from "../models/Submissions.js";
 import Problem from "../models/Problem.js";
 import DsaProgress from "../models/DsaProgress.js";
-import judge from "../Utils/judge.js";
+import { codeExecutionQueue } from "../queues/codeExecutionQueue.js";
 
-export const submitSolution = async (req, res) => {
-    const { problemId, code, language } = req.body;
-    const userId = req.user.id;
+export const submitCode = async (req, res) => {
 
-    const problem = await Problem.findById(problemId);
-    if (!problem) {
-        return res.status(404).json({ message: "Problem not found" });
+    try {
+
+        const { problemId, code, language } = req.body;
+        const userId = req.user.id;
+
+        const problem = await Problem.findById(problemId);
+
+        if (!problem) {
+            return res.status(404).json({
+                message: "Problem not found"
+            });
+        }
+
+        // 🔥 Create submission
+        const submission = await Submission.create({
+            userId,
+            problemId,
+            code,
+            language,
+            status: "Pending"
+        });
+
+        // 🔥 Push job to queue
+        await codeExecutionQueue.add("submitCode", {
+            submissionId: submission._id,
+            problemId,
+            code,
+            language
+        });
+
+        res.status(200).json({
+            message: "Submission received",
+            submissionId: submission._id,
+            status: "Pending"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            message: "Submission failed"
+        });
+
     }
-
-    // 🔥 Judge
-    const result = judge({
-        code,
-        testCases: problem.testCases,
-        language,
-    });
-
-    // Save submission
-    await Submission.create({
-        userId,
-        problemId,
-        code,
-        language,
-        verdict: result.verdict,
-    });
-
-    // Update progress if accepted
-    if (result.verdict === "Accepted") {
-        await updateProgress(userId, problem);
-    }
-
-    res.json(result);
 };
-
 /* ---------------- HELPERS ---------------- */
 
-const updateProgress = async (userId, problem) => {
+/*const updateProgress = async (userId, problem) => {
     let progress = await DsaProgress.findOne({ userId });
 
     if (!progress) {
@@ -75,4 +89,6 @@ const updateProgress = async (userId, problem) => {
 
         await progress.save();
     }
-};
+};*/
+
+

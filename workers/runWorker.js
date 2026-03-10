@@ -1,17 +1,100 @@
-import Redis from "ioredis";
+import { Worker } from "bullmq";
+import IORedis from "ioredis";
+
+import Submission from "../backend/models/Submissions.js";
+import Problem from "../backend/models/Problem.js";
 import { executeCode } from "./dockerExecutor.js";
 
-const redis = new Redis();
+const connection = new IORedis({
+    maxRetriesPerRequest: null
+});
 
-async function startWorker() {
-    console.log("Run Worker Started");
+console.log("Run Worker Started");
 
-    while (true) {
-        const job = await redis.brpop("codeExecutionQueue", 0);
-        const data = JSON.parse(job[1]);
+const worker = new Worker(
+    "codeExecutionQueue",
 
-        await executeCode(data);
-    }
-}
+    async (job) => {
 
-startWorker();
+        const { submissionId, problemId, code, language } = job.data;
+
+        try {
+
+            // 🔥 Update status → Running
+            await Submission.findByIdAndUpdate(submissionId, {
+                status: "Running"
+            });
+
+            const problem = await Problem.findById(problemId);
+
+            if (!problem) {
+
+                await Submission.findByIdAndUpdate(submissionId, {
+                    status: "Error",
+                    output: "Problem not found"
+                });
+
+                return;
+            }
+
+            const testCases = problem.testCases;
+
+            let verdict = "Accepted";
+            let finalOutput = "";
+
+            for (const testCase of testCases) {
+
+                const result = await executeCode({
+                    code,
+                    language,
+                    input: testCase.input
+                });
+
+                if (result.error) {
+
+                    verdict = "Runtime Error";
+                    finalOutput = result.error;
+                    break;
+
+                }
+
+                if (result.output.trim() !== testCase.output.trim()) {
+
+                    verdict = "Wrong Answer";
+                    finalOutput = result.output;
+                    break;
+
+                }
+
+                finalOutput = result.output;
+            }
+
+            // 🔥 Update submission result
+            await Submission.findByIdAndUpdate(submissionId, {
+                status: verdict,
+                output: finalOutput
+            });
+
+        } catch (error) {
+
+            console.error(error);
+
+            await Submission.findByIdAndUpdate(submissionId, {
+                status: "Error",
+                output: error.message
+            });
+
+        }
+
+    },
+
+    { connection }
+);
+
+worker.on("completed", (job) => {
+    console.log("Submission processed:", job.id);
+});
+
+worker.on("failed", (job, err) => {
+    console.error("Worker error:", err);
+});

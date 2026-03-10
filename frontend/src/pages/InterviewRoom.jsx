@@ -276,6 +276,7 @@ export default function InterviewRoom() {
     };*/
 
     const runCode = () => {
+
         if (!code) return;
 
         setRunLoading(true);
@@ -285,8 +286,65 @@ export default function InterviewRoom() {
         socket.emit("run-code", {
             roomId,
             code,
-            language,
+            language
         });
+
+    };
+
+    const submitCode = async () => {
+
+        if (!problem) return;
+
+        setRunLoading(true);
+        setStatus("Submitting...");
+        setOutput("");
+
+        try {
+
+            const res = await api.post("/submissions", {
+                problemId: problem.id,
+                code,
+                language
+            });
+
+            setStatus("Pending");
+            setOutput("Submission queued");
+
+            pollSubmission(res.data.submissionId);
+
+        } catch (err) {
+
+            setRunLoading(false);
+            setStatus("Error");
+            setOutput("Submission failed");
+
+        }
+    };
+
+    const pollSubmission = async (submissionId) => {
+
+        const interval = setInterval(async () => {
+
+            const res = await api.get(`/submissions/${submissionId}`);
+
+            const sub = res.data;
+
+            setStatus(sub.status);
+
+            if (sub.output) {
+                setOutput(sub.output);
+            }
+
+            if (
+                sub.status !== "Pending" &&
+                sub.status !== "Running"
+            ) {
+                clearInterval(interval);
+                setRunLoading(false);
+            }
+
+        }, 2000);
+
     };
 
     /* ================= INTERVIEWER: SELECT PROBLEM ================= */
@@ -529,6 +587,13 @@ export default function InterviewRoom() {
                                 className="px-3 py-1.5 bg-[var(--accent)]/15 text-[var(--accent)] rounded"
                             >
                                 Run
+                            </button>
+
+                            <button
+                                onClick={submitCode}
+                                className="px-3 py-1.5 bg-green-500/15 text-green-500 rounded"
+                            >
+                                Submit
                             </button>
 
                             {isInterviewer && (

@@ -1,8 +1,10 @@
-import Redis from "ioredis";
+import IORedis from "ioredis";
+
+const subscriber = new IORedis();
 
 export function subscribeExecution(io) {
 
-    const sub = new Redis();
+    const sub = new IORedis();
 
     sub.subscribe("executionResults");
 
