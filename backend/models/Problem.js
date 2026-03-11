@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 /* ================= TEST CASE SCHEMA ================= */
-
 const testCaseSchema = new mongoose.Schema(
     {
         input: {

@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import interviewRoutes from "./routes/interviewRoutes.js";
+import submissionsRoutes from "./routes/submissionRoutes.js";
 
 import "./config/firebaseAdmin.js";
 
@@ -43,5 +44,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/interview", interviewRoutes);
+app.use("/api/submissions", submissionsRoutes);
 
 export default app;

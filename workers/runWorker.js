@@ -1,9 +1,14 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 
+import connectDB from "../backend/config/db.js";
+
+
 import Submission from "../backend/models/Submissions.js";
 import Problem from "../backend/models/Problem.js";
 import { executeCode } from "./dockerExecutor.js";
+
+await connectDB();
 
 const connection = new IORedis({
     maxRetriesPerRequest: null
