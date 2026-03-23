@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Loader from "../components/Loader";
-import { useAuth } from "../context/AuthContext";
-import api from "../utils/axios";
+import Loader from "../../components/Loader";
+import { useAuth } from "../../context/AuthContext";
+import api from "../../utils/axios";
 import { toast } from "sonner";
 
 export default function InterviewWait() {
@@ -33,7 +33,7 @@ export default function InterviewWait() {
 
     // ---- DB polling ----
     useEffect(() => {
-        const interval = setInterval(async () => {
+        /*const interval = setInterval(async () => {
             try {
                 const res = await api.get(`/interview/${roomId}`);
                 console.log("WAIT POLL:", res.data);
@@ -45,6 +45,23 @@ export default function InterviewWait() {
                     navigate(`/interview/lobby/${roomId}`);
                     toast.error("Your interviewer has rejected your request to join the interview.");
                 }
+            } catch { }
+        }, 3000);*/
+
+        const interval = setInterval(async () => {
+            try {
+                const res = await api.get(`/interview/${roomId}`);
+
+                if (res.data.approved === true) {
+                    navigate(`/interview/${roomId}`);
+                }
+
+                // ❌ don't treat pending as rejection
+                if (res.data.myRole === null) {
+                    navigate(`/interview/lobby/${roomId}`);
+                    toast.error("Your interviewer has rejected your request to join the interview.");
+                }
+
             } catch { }
         }, 3000);
 

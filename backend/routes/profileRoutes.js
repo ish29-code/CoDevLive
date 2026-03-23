@@ -9,6 +9,6 @@ import {
 const router = express.Router();
 
 router.get("/me", protect, getMyProfile);
-router.put("/me", protect, upsertProfile);
+router.put("/update", protect, upsertProfile);
 
 export default router;

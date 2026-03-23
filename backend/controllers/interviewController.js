@@ -4,7 +4,7 @@ import InterviewFeedback from "../models/InterviewFeedback.js";
 import crypto from "crypto";
 import Interview from "../models/Interview.js";
 import InterviewEvaluation from "../models/InterviewEvaluation.js";
-import { getIO } from "../socket.js";
+import { getIO, userSockets } from "../socket.js";
 
 export const createInterview = async (req, res) => {
     const roomId = crypto.randomUUID();
@@ -68,14 +68,45 @@ export const joinInterview = async (req, res) => {
     });
     console.log("HOST CHECK", interview.createdBy.toString(), userId);
 
+    // notify host DIRECTLY (IMPORTANT FIX)
+    console.log("🧠 userSockets map:", [...userSockets.entries()]);
+    console.log("EMITTING JOIN REQUEST TO HOST");
 
-    // notify host
+
+
     const io = getIO();
+
     io.to(roomId).emit("join-request", {
         userId,
         name: req.user.fullName || req.user.email,
-        requestedRole: role
+        role
     });
+    console.log("✅ Join request emitted to room:", roomId);
+
+    /*let hostSocket = getUserSocket(interview.createdBy.toString());
+
+    let retries = 6;
+
+    while (!hostSocket && retries > 0) {
+        console.log("⏳ Waiting for host socket...");
+        await new Promise(res => setTimeout(res, 500));
+        hostSocket = getUserSocket(interview.createdBy.toString());
+        retries--;
+    }
+
+    if (hostSocket) {
+        io.to(hostSocket).emit("join-request", {
+            userId,
+            name: req.user.fullName || req.user.email,
+            role
+        });
+        console.log("✅ Join request sent to host");
+    } else {
+        console.log("❌ Host socket STILL NOT FOUND after retries");
+    }*/
+
+
+
 
     return res.json({
         role,
@@ -167,7 +198,7 @@ export const getInterview = async (req, res) => {
 
     const userId = req.user.id;
 
-    const myParticipant = await InterviewParticipant.findOne({
+    let myParticipant = await InterviewParticipant.findOne({
         interviewId: interview._id,
         userId: req.user.id
     }).lean();
@@ -307,11 +338,31 @@ export const approveParticipant = async (req, res) => {
     //console.log("PARTICIPANT FOUND:", participant);
 
     // 🔔 Notify via socket
+    /* const io = getIO();
+     io.to(roomId).emit("participant-approved", {
+         userId: userId,
+         role: participant.role
+     });*/
+    // ✅ FIXED SOCKET EMIT
     const io = getIO();
+
     io.to(roomId).emit("participant-approved", {
-        userId: userId,
+        userId,
         role: participant.role
     });
+    /*const participantSocket = getUserSocket(userId.toString());
+
+    console.log("🔍 Looking for participant:", userId.toString());
+    console.log("🎯 Found participant socket:", participantSocket);
+
+    if (participantSocket) {
+        getIO().to(participantSocket).emit("participant-approved", {
+            userId,
+            role: participant.role
+        });
+    } else {
+        console.log("❌ Participant socket NOT FOUND");
+    }*/
 
     res.json({ success: true });
 };
@@ -365,7 +416,24 @@ export const rejectParticipant = async (req, res) => {
     });
 
     const io = getIO();
-    io.to(roomId).emit("participant-rejected", { userId });
+
+    io.to(roomId).emit("participant-rejected", {
+        userId,
+        role: participant.role
+    });
+    /*const participantSocket = getUserSocket(userId.toString());
+
+    console.log("🔍 Looking for student:", userId.toString());
+    console.log("🎯 Found student socket:", participantSocket);
+
+    if (participantSocket) {
+        getIO().to(participantSocket).emit("participant-rejected", {
+            userId,
+            role: participant.role
+        });
+    } else {
+        console.log("❌ Student socket NOT FOUND");
+    }*/
 
     res.json({ success: true });
 };

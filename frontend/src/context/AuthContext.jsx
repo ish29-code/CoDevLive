@@ -8,6 +8,7 @@ import {
   signInWithPopup,
   getIdToken,
 } from "firebase/auth";
+
 import { auth, googleProvider, githubProvider } from "../firebase";
 import {
   login as loginService,
@@ -15,19 +16,57 @@ import {
 } from "../services/authService";
 import { forgotPasswordLocal } from "../api/userApi";
 import authHeader from "@/services/authHeader";
-//import { a } from "framer-motion/dist/types.d-Cjd591yU";
+import { connectSocket } from "../utils/socket";
+
+
+
 
 const AuthContext = createContext();
-
 /* ================= NORMALIZE USER ================= */
 const normalizeUser = (user) => ({
+  _id: user._id || user.uid, // 🔥 ALWAYS ensure _id exists
   ...user,
-  name: user.name || user.fullName || "",
 });
+
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const [socketReady, setSocketReady] = useState(false);
+
+  /*useEffect(() => {
+    if (!user?._id) return;
+    console.log("🔌 Attempting socket connection for user:", user._id);
+
+    const socket = connectSocket({ _id: user._id });
+
+    socket.on("connect", () => {
+      console.log("✅ Socket READY");
+      setSocketReady(true);
+    });
+
+  }, [user]);*/
+
+  useEffect(() => {
+    if (!user?._id) return;
+
+    console.log("🔌 Attempting socket connection for user:", user._id);
+
+    const socket = connectSocket({ _id: user._id });
+
+    if (!socket) return;
+
+    socket.on("connect", () => {
+      console.log("✅ Socket CONNECTED");
+      setSocketReady(true);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.log("❌ Socket connection error:", err.message);
+    });
+
+  }, [user]);
 
   /* =====================================================
      🔥 RESTORE USER + PROFILE ON APP LOAD
@@ -156,7 +195,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     const fallbackUser = normalizeUser({
-      uid: firebaseUser.uid,
+      ...firebaseUser,
       email: firebaseUser.email,
       name: firebaseUser.displayName,
       photoURL: firebaseUser.photoURL,
@@ -165,6 +204,18 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("user", JSON.stringify(fallbackUser));
     setUser(fallbackUser);
     return fallbackUser;
+
+    // src/context/AuthContext.js
+    /*const normalized = normalizeUser({
+      ...data.user,
+      name: data.user.fullName,
+      photoURL: firebaseUser.photoURL // ✅ keep firebase photo
+    });
+
+    localStorage.setItem("user", JSON.stringify(normalized));
+    setUser(normalized);
+    return normalized;*/
+
   };
 
   const loginWithGoogle = () => handleSocialSignIn(googleProvider);
@@ -189,7 +240,7 @@ export const AuthProvider = ({ children }) => {
     const idToken = await getIdToken(res.user);
 
     const profile = normalizeUser({
-      uid: res.user.uid,
+      ...res.user,
       email: res.user.email,
       name: res.user.displayName,
     });
@@ -206,7 +257,7 @@ export const AuthProvider = ({ children }) => {
     const idToken = await getIdToken(res.user);
 
     const profile = normalizeUser({
-      uid: res.user.uid,
+      ...res.user,
       email: res.user.email,
       name: res.user.displayName,
     });
@@ -223,6 +274,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         loading,
+        socketReady,
         login,
         signup,
         logout,

@@ -10,8 +10,10 @@ import {
     Minimize2
 } from "lucide-react";
 
-import { socket } from "../../utils/socket";
+import { getSocket } from "../../utils/socket";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
+
 
 const ICE = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
@@ -45,7 +47,7 @@ const VideoTile = memo(({ stream, muted }) => {
 //////////////////////////////////////////////////////////
 
 export default function VideoCall({ roomId }) {
-
+    const { socketReady } = useAuth();
     const { theme } = useTheme();
 
     const streamRef = useRef(null);
@@ -63,6 +65,15 @@ export default function VideoCall({ roomId }) {
     //////////////////////////////////////////////////////////
 
     useEffect(() => {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+
+        if (!socket) {
+            console.log("⏳ Socket not ready (init)");
+            return;
+        }
 
         let mounted = true;
 
@@ -122,19 +133,31 @@ export default function VideoCall({ roomId }) {
 
         return () => {
             mounted = false;
-            socket.removeAllListeners();
+            if (socket) {
+                socket.removeAllListeners();
+            }
+
 
             Object.values(pcsRef.current).forEach(pc => pc.close());
             streamRef.current?.getTracks().forEach(t => t.stop());
         };
 
-    }, [roomId]);
+    }, [socketReady, roomId]);
 
     //////////////////////////////////////////////////////////
     // CONNECTION
     //////////////////////////////////////////////////////////
 
     function createConnection(userId) {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+
+        if (!socket) {
+            console.log("⏳ Socket not ready (createConnection)");
+            return;
+        }
 
         if (pcsRef.current[userId]) return;
 
@@ -156,6 +179,15 @@ export default function VideoCall({ roomId }) {
     }
 
     function createPeer(userId) {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+
+        if (!socket) {
+            console.log("⏳ Socket not ready (createPeer)");
+            return;
+        }
 
         const pc = new RTCPeerConnection(ICE);
 

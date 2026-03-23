@@ -1,65 +1,12 @@
-// socket.js
-/*import { Server } from "socket.io";
-
-let io;
-
-export const setupSocket = (server) => {
-    io = new Server(server, {
-        cors: {
-            origin: "http://localhost:5173",
-            credentials: true
-        },
-    });
-
-    io.on("connection", (socket) => {
-        console.log("🔌 User connected:", socket.id);
-
-        socket.on("join-room", (roomId) => {
-            socket.join(roomId);
-            console.log(`👥 ${socket.id} joined room ${roomId}`);
-        });
-
-        socket.on("code-change", ({ roomId, code }) => {
-            socket.to(roomId).emit("code-update", code);
-        });
-
-        socket.on("webrtc-offer", ({ roomId, offer }) => {
-            socket.to(roomId).emit("webrtc-offer", offer);
-        });
-
-        socket.on("webrtc-answer", ({ roomId, answer }) => {
-            socket.to(roomId).emit("webrtc-answer", answer);
-        });
-
-        socket.on("ice-candidate", ({ roomId, candidate }) => {
-            socket.to(roomId).emit("ice-candidate", candidate);
-        });
-
-        socket.on("toggle-hints", ({ roomId, show, count }) => {
-            socket.to(roomId).emit("hints-visibility", { show, count });
-        });
-
-
-        socket.on("disconnect", () => {
-            console.log("❌ User disconnected:", socket.id);
-        });
-    });
-
-    return io;
-};
-
-
-export const getIO = () => io;*/
-
-// backend/socket.js
 import { Server } from "socket.io";
 import { codeExecutionQueue } from "./queues/codeExecutionQueue.js";
-
-
-
+import Interview from "./models/Interview.js";
+import InterviewParticipant from "./models/InterviewParticipant.js";
 
 let io;
-const rooms = {}; // roomId => [socketIds]
+
+// 🔹 Map userId -> socketId
+export const userSockets = new Map();
 
 export const setupSocket = (server) => {
     io = new Server(server, {
@@ -69,48 +16,112 @@ export const setupSocket = (server) => {
         },
     });
 
-    io.on("connection", (socket) => {
-        console.log("🔌 Connected:", socket.id);
+    // ✅ AUTH MIDDLEWARE (HERE ONLY)
+    io.use((socket, next) => {
+        const userId = socket.handshake.auth?.userId;
 
-        // ===== JOIN ROOM =====
-        socket.on("join-room", (roomId) => {
+        if (!userId) {
+            return next(new Error("Unauthorized"));
+        }
+
+        socket.userId = userId;
+        next();
+    });
+
+    io.on("connection", (socket) => {
+
+        // 🔹 get userId from frontend auth
+        const userId = socket.handshake.auth?.userId;
+
+
+        if (userId) {
+            userSockets.set(userId.toString(), socket.id);
+        }
+
+        console.log("🔌 Connected:", socket.id, "USER:", userId);
+        console.log("🧠 Stored userSockets:", [...userSockets.entries()]);
+
+        // ================= JOIN ROOM =================
+        /* socket.on("join-room", async (roomId) => {
+ 
+             socket.join(roomId);
+ 
+             console.log(`ROOM JOINED: ${socket.id} ${roomId}`);
+ 
+             // show who is in the room
+             const clients = io.sockets.adapter.rooms.get(roomId);
+             console.log("ROOM MEMBERS:", clients ? [...clients] : []);
+ 
+             // 🔹 send pending requests if interviewer reloads
+             const interview = await Interview.findOne({ roomId });
+ 
+             if (interview) {
+ 
+                 const pending = await InterviewParticipant.find({
+                     interviewId: interview._id,
+                     status: "pending"
+                 }).populate("userId", "fullName email");
+ 
+                 pending.forEach(p => {
+ 
+                     socket.emit("join-request", {
+                         userId: p.userId._id,
+                         name: p.userId.fullName || p.userId.email,
+                         role: p.role
+                     });
+ 
+                 });
+             }
+         });*/
+        socket.on("join-room", async (roomId) => {
             socket.join(roomId);
 
-            if (!rooms[roomId]) rooms[roomId] = [];
-            rooms[roomId].push(socket.id);
+            console.log(`ROOM JOINED: ${socket.id} ${roomId}`);
 
-            // send existing users to new user
-            const otherUsers = rooms[roomId].filter(id => id !== socket.id);
-            socket.emit("all-users", otherUsers);
+            const interview = await Interview.findOne({ roomId });
+            if (!interview) return;
 
-            // notify others that new user joined
-            socket.to(roomId).emit("user-joined", socket.id);
+            const pending = await InterviewParticipant.find({
+                interviewId: interview._id,
+                status: "pending"
+            }).populate("userId", "fullName email");
 
-            console.log(`👥 ${socket.id} joined ${roomId}`);
+            console.log("📨 Sending pending requests:", pending.length);
+
+            pending.forEach(p => {
+                socket.emit("join-request", {
+                    userId: p.userId._id,
+                    name: p.userId.fullName || p.userId.email,
+                    role: p.role
+                });
+            });
         });
 
-        // ===== WEBRTC SIGNALING =====
+        // ================= WEBRTC SIGNALING =================
+
         socket.on("webrtc-offer", ({ to, offer }) => {
-            io.to(to).emit("webrtc-offer", { from: socket.id, offer });
+            io.to(to).emit("webrtc-offer", {
+                from: socket.id,
+                offer
+            });
         });
 
         socket.on("webrtc-answer", ({ to, answer }) => {
-            io.to(to).emit("webrtc-answer", { from: socket.id, answer });
+            io.to(to).emit("webrtc-answer", {
+                from: socket.id,
+                answer
+            });
         });
 
         socket.on("ice-candidate", ({ to, candidate }) => {
-            io.to(to).emit("ice-candidate", { from: socket.id, candidate });
+            io.to(to).emit("ice-candidate", {
+                from: socket.id,
+                candidate
+            });
         });
 
-        // ===== CLEANUP =====
-        socket.on("disconnect", () => {
-            console.log("❌ Disconnected:", socket.id);
+        // ================= CODE EXECUTION =================
 
-            for (const roomId in rooms) {
-                rooms[roomId] = rooms[roomId].filter(id => id !== socket.id);
-                socket.to(roomId).emit("user-left", socket.id);
-            }
-        });
         socket.on("run-code", async ({ roomId, code, language }) => {
 
             const job = {
@@ -126,10 +137,28 @@ export const setupSocket = (server) => {
             });
 
         });
+
+        // ================= DISCONNECT =================
+
+        socket.on("disconnect", () => {
+
+            if (userId) {
+                userSockets.delete(userId.toString());
+            }
+
+            console.log("❌ Disconnected:", socket.id);
+
+        });
+
     });
 
     return io;
 };
 
+// 🔹 normal socket access
 export const getIO = () => io;
 
+// 🔹 get socketId of a specific user
+export const getUserSocket = (userId) => {
+    return userSockets.get(userId?.toString());
+};

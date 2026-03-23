@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
-import { socket } from "../utils/socket";
+import { getSocket } from "../utils/socket";
 import Editor from "@monaco-editor/react";
 import VideoCall from "../components/interview/VideoCall";
 import Loader from "../components/Loader";
 import { problems } from "../data/problems";
 import api from "../utils/axios";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 
 
 import {
@@ -19,6 +19,7 @@ import {
     History,
     BarChart3,
 } from "lucide-react";
+
 
 
 
@@ -73,6 +74,7 @@ export default function InterviewRoom() {
 
 
     const [showEval, setShowEval] = useState(false);
+    const { socketReady } = useAuth();
 
 
     useEffect(() => {
@@ -99,17 +101,39 @@ export default function InterviewRoom() {
     }, [roomId]);
 
 
-    useEffect(() => {
+    /*useEffect(() => {
         if (!roomId) return;
 
         if (!joinedRef.current) {
             socket.emit("join-room", roomId);
             joinedRef.current = true;
         }
-    }, [roomId]);
+    }, [roomId]);*/
+
+    useEffect(() => {
+        if (!socketReady || !isInterviewer) return;
+
+        const socket = getSocket();
+        if (!socket) return;
+
+        console.log("🔥 joining room after lister is ready ");
+
+        socket.emit("join-room", roomId);
+
+    }, [socketReady, isInterviewer, roomId]);
 
 
     useEffect(() => {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+
+        // ✅ ADD THIS LINE (VERY IMPORTANT)
+        if (!socket) {
+            console.log("⏳ Socket not ready (listeners)");
+            return;
+        }
 
         // ---- CHEAT EVENTS ----
         const onCheatEvent = (e) => {
@@ -132,35 +156,32 @@ export default function InterviewRoom() {
             setHintsUsed(count);
         };
 
-
         // ---- HOST RECEIVES JOIN REQUESTS ----
         const onJoinRequest = (participant) => {
-            setPendingStudents(prev => [...prev, participant]);
+            console.log("JOIN REQUEST RECEIVED", participant);
+
+            setPendingStudents(prev => {
+                if (prev.some(p => p.userId === participant.userId)) return prev;
+                return [...prev, participant];
+            });
         };
 
-        // ---- PARTICIPANT APPROVED ----
         const onParticipantApproved = ({ userId }) => {
-
-            // Interviewers → remove from pending list
             setPendingStudents(prev =>
-                prev.filter(p => p.userId !== userId)
+                prev.filter(p => p.userId.toString() !== userId.toString())
             );
-        }
+        };
 
         const onParticipantRejected = ({ userId }) => {
-
-            // Interviewers → remove from pending list
             setPendingStudents(prev =>
-                prev.filter(p => p.userId !== userId)
+                prev.filter(p => p.userId.toString() !== userId.toString())
             );
-        }
+        };
 
-        // ---- EXECUTION STATUS ----
         const onExecutionStatus = (data) => {
             setStatus(data.status);
         };
 
-        // ---- EXECUTION RESULT ----
         const onExecutionResult = (data) => {
             setRunLoading(false);
 
@@ -177,19 +198,26 @@ export default function InterviewRoom() {
             }
         };
 
+        const registerListeners = () => {
+            console.log("Registering socket listeners");
 
+            socket.on("cheat-event", onCheatEvent);
+            socket.on("problem-assigned", onProblemAssigned);
+            socket.on("hints-visibility", onHintsVisibility);
+            socket.on("join-request", onJoinRequest);
+            socket.on("participant-approved", onParticipantApproved);
+            socket.on("participant-rejected", onParticipantRejected);
+            socket.on("execution-status", onExecutionStatus);
+            socket.on("execution-result", onExecutionResult);
+        };
 
-        // ---- SOCKET LISTENERS ----
-        socket.on("cheat-event", onCheatEvent);
-        socket.on("problem-assigned", onProblemAssigned);
-        socket.on("hints-visibility", onHintsVisibility);
-        socket.on("join-request", onJoinRequest);
-        socket.on("participant-approved", onParticipantApproved);
-        socket.on("participant-rejected", onParticipantRejected);
-        socket.on("execution-status", onExecutionStatus);
-        socket.on("execution-result", onExecutionResult);
+        // 🔥 WAIT FOR SOCKET CONNECTION
+        if (socket.connected) {
+            registerListeners();
+        } else {
+            socket.once("connect", registerListeners);
+        }
 
-        // ---- CLEANUP ----
         return () => {
             socket.off("cheat-event", onCheatEvent);
             socket.off("problem-assigned", onProblemAssigned);
@@ -200,8 +228,9 @@ export default function InterviewRoom() {
             socket.off("execution-status", onExecutionStatus);
             socket.off("execution-result", onExecutionResult);
         };
-    }, [roomId, isCreator, navigate, user]
-    );
+
+    }, [socketReady]);
+
 
     /*useEffect(() => {
         if (!isInterviewer) return;
@@ -221,6 +250,13 @@ export default function InterviewRoom() {
 
     /* ================= ANTI-CHEAT ================= */
     useEffect(() => {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+        if (!socket) {
+            return;
+        }
         if (!isStudent) return;
 
         const blur = () =>
@@ -237,7 +273,7 @@ export default function InterviewRoom() {
             window.removeEventListener("blur", blur);
             document.removeEventListener("visibilitychange", hidden);
         };
-    }, [roomId, isStudent]);
+    }, [socketReady, roomId, isStudent]);
 
     /* ================= TIMER ================= */
     useEffect(() => {
@@ -276,6 +312,13 @@ export default function InterviewRoom() {
     };*/
 
     const runCode = () => {
+        if (!socketReady) {
+            return;
+        }
+        const socket = getSocket();
+        if (!socket) {
+            return;
+        }
 
         if (!code) return;
 
@@ -292,7 +335,6 @@ export default function InterviewRoom() {
     };
 
     const submitCode = async () => {
-
         if (!problem) return;
 
         setRunLoading(true);
@@ -462,13 +504,18 @@ export default function InterviewRoom() {
                                         </div>
 
                                         <button className="cursor-pointer"
-                                            onClick={() =>
+                                            onClick={() => {
+                                                if (!socketReady) {
+                                                    return;
+                                                }
+                                                const socket = getSocket();
+                                                if (!socket) return;
                                                 socket.emit("toggle-hints", {
                                                     roomId,
                                                     show: true,
                                                     count: hintsUsed   // send current unlocked count
                                                 })
-                                            }
+                                            }}
                                         >
                                             Show to student
                                         </button>

@@ -16,11 +16,14 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import Loader from "../components/Loader";
 import api from "../utils/axios";
+import { useAuth } from "@/context/AuthContext";
+
 
 export default function InterviewLobby() {
     const { theme } = useTheme();
     const { roomId } = useParams();
     const navigate = useNavigate();
+    const { socketReady } = useAuth();
 
     const videoRef = useRef(null);
     const streamRef = useRef(null);
@@ -39,7 +42,7 @@ export default function InterviewLobby() {
     const [isHost, setIsHost] = useState(false);
 
 
-    useEffect(() => {
+    /*useEffect(() => {
         if (!roomId) return;
 
         api.get(`/interview/${roomId}`).then(res => {
@@ -48,8 +51,27 @@ export default function InterviewLobby() {
                 setSelectedRole("interviewer"); // force host role
             }
         });
-    }, [roomId]);
+    }, [roomId]);*/
 
+    useEffect(() => {
+        if (!roomId) return;
+
+        const loadData = async () => {
+            try {
+                const res = await api.get(`/interview/${roomId}`);
+
+                if (res.data.isCreator) {
+                    setIsHost(true);
+                    setSelectedRole("interviewer"); // auto select host
+                }
+            } catch (err) {
+                console.error("Failed to load interview", err);
+            }
+        };
+
+        loadData();
+
+    }, [roomId]);
 
     /* ================= MEDIA PREVIEW ================= */
     useEffect(() => {
@@ -169,6 +191,14 @@ export default function InterviewLobby() {
 
     const joinInterview = async () => {
         if (!canJoin || !roomId) return;
+
+        if (!socketReady) {
+            console.log("⏳ Waiting for socket...");
+            return;
+        }
+
+        console.log("✅ Socket ready, sending join request");
+
 
         setLoading(true);
 
@@ -364,8 +394,13 @@ export default function InterviewLobby() {
 
                     </div>
 
+                    {!socketReady && (
+                        <p className="text-yellow-500 text-xs text-center">
+                            ⏳ Connecting to server...
+                        </p>)}
+
                     <button
-                        disabled={!canJoin}
+                        disabled={!canJoin || !socketReady}
                         onClick={joinInterview}
                         className={`btn-primary w-full mt-2 ${!canJoin ? "opacity-50 cursor-not-allowed" : ""
                             }`}
