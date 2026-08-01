@@ -372,7 +372,7 @@ Your app should now be running 🚀
 
 ---
 
-# 👩‍💻 Author
+# 👩‍💻 Author-
 
 **Ishika Deshpande**  
 Backend-focused Full Stack Engineer passionate about distributed systems, real-time architecture, and scalable backend design.
