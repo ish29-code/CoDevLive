@@ -372,7 +372,8 @@ Your app should now be running 🚀
 
 ---
 
-<img width="14980" height="7928" alt="CoDevLive" src="https://github.com/user-attachments/assets/9414c8cd-68f5-4ddb-bc81-63270592e384" />
+<img width="1751" height="929" alt="Screenshot From 2026-09-15 17-12-16" src="https://github.com/user-attachments/assets/48a2741c-c87e-4f16-8dc0-189aae8d091d" />
+
 
 # 👩‍💻 Author-
 
