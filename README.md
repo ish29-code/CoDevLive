@@ -372,6 +372,8 @@ Your app should now be running 🚀
 
 ---
 
+<img width="14980" height="7928" alt="CoDevLive" src="https://github.com/user-attachments/assets/9414c8cd-68f5-4ddb-bc81-63270592e384" />
+
 # 👩‍💻 Author-
 
 **Ishika Deshpande**  
